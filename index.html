@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>이론 66 · 지휘 학습</title>
+<style>
+:root{
+  /* 배경 위계 */
+  --bg:#0c1116;--surface:#18212a;--surface2:#212c36;--raised:#26333f;
+  --line:rgba(255,255,255,.12);--line2:rgba(255,255,255,.22);
+  /* 글자 위계 — 대비 강화 */
+  --text:#f4f8f9;      /* 제목·강조 (최고 대비) */
+  --body:#dbe4e8;      /* 본문 (읽는 글, 밝게) */
+  --muted:#a7b4bc;     /* 보조 (AA 통과) */
+  --faint:#75818b;     /* 장식용만 */
+  /* 강조색 — 텍스트로도 읽히게 살짝 밝힘 */
+  --mint:#6fe9cd;--mint2:#3cc4a4;--coral:#ff8575;--amber:#f5d18f;--slate:#a2b3de;
+  --mono:ui-monospace,'SF Mono','Roboto Mono',monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--body);
+  font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+  font-size:16px;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;line-height:1.6;letter-spacing:-.003em;}
+.wrap{max-width:620px;margin:0 auto;padding:20px 16px 64px;}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+
+/* header */
+header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;}
+header h1{font-size:1.6rem;font-weight:800;margin:0;letter-spacing:-.02em;color:var(--text);}header h1 b{color:var(--mint);}
+header .sub{font-size:.78rem;color:var(--muted);font-family:var(--mono);font-weight:600;}
+
+/* progress */
+.prog{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-bottom:14px;}
+.prog-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:11px;}
+.prog-pct{font-size:1.7rem;font-weight:800;font-family:var(--mono);color:var(--mint);letter-spacing:-.02em;}
+.prog-pct small{font-size:.8rem;color:var(--muted);font-weight:600;margin-left:5px;}
+.prog-stats{display:flex;gap:16px;font-size:.8rem;color:var(--muted);font-family:var(--mono);font-weight:600;}.prog-stats b{color:var(--text);font-weight:800;}
+.bar{height:8px;background:var(--surface2);border-radius:5px;overflow:hidden;}.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--mint2),var(--mint));border-radius:5px;transition:width .5s;}
+
+/* today */
+.today{background:linear-gradient(135deg,rgba(111,233,205,.16),rgba(162,179,222,.09));border:1px solid var(--line2);border-radius:16px;padding:18px;margin-bottom:22px;}
+.today .lab{font-size:.72rem;color:var(--mint);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;font-weight:700;}
+.today .day{font-size:1.22rem;font-weight:800;margin:6px 0 3px;color:var(--text);letter-spacing:-.01em;}
+.today .ph{font-size:.82rem;color:var(--muted);margin-bottom:14px;font-weight:500;}
+.today .go{display:block;width:100%;background:var(--mint);color:#0a1013;font-size:1rem;font-weight:800;border-radius:11px;padding:13px;text-align:center;}
+.today.done{background:var(--surface);}.today.done .go{background:var(--surface2);color:var(--muted);}
+
+/* map */
+.map-h{font-size:.78rem;color:var(--muted);font-family:var(--mono);letter-spacing:.08em;margin:0 2px 12px;text-transform:uppercase;font-weight:700;}
+.wk{margin-bottom:13px;}
+.wk-lab{display:flex;gap:8px;font-size:.8rem;color:var(--muted);margin-bottom:6px;padding-left:2px;font-weight:500;}.wk-lab b{color:var(--text);font-weight:800;}
+.wk-days{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;}
+.cell{aspect-ratio:1;border-radius:10px;background:var(--surface2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.9rem;font-weight:700;color:var(--muted);position:relative;transition:transform .1s;}
+.cell:active{transform:scale(.94);}
+.cell.done{background:var(--mint);color:#0a1013;border-color:var(--mint);font-weight:800;}.cell.done::after{content:'✓';position:absolute;top:2px;right:5px;font-size:.58rem;opacity:.75;}
+.cell.exam{border-color:var(--amber);color:var(--amber);}.cell.exam.done{background:var(--amber);color:#0a1013;}
+.cell.cur{border-color:var(--mint);box-shadow:0 0 0 2px rgba(111,233,205,.4);color:var(--mint);}.cell.cur.done{color:#0a1013;}
+
+/* lesson */
+#lesson{display:none;}
+.back{font-size:.9rem;color:var(--muted);padding:8px 0;margin-bottom:6px;font-weight:600;}
+.l-head{margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+.l-day{font-size:.72rem;color:var(--mint);font-family:var(--mono);letter-spacing:.1em;font-weight:700;}
+.l-t{font-size:1.45rem;font-weight:800;margin:6px 0 9px;letter-spacing:-.015em;color:var(--text);line-height:1.25;}
+.l-lead{font-size:.98rem;color:var(--body);line-height:1.7;}
+.sec{margin-bottom:26px;}
+.sec-h{display:flex;align-items:center;gap:9px;font-size:.95rem;font-weight:800;color:var(--text);margin-bottom:12px;}
+.sec-h .n{width:24px;height:24px;border-radius:50%;background:var(--mint);color:#0a1013;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;font-family:var(--mono);flex:0 0 auto;}
+.sec-h .tag{font-size:.66rem;font-weight:700;color:var(--faint);font-family:var(--mono);letter-spacing:.05em;}
+.read{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+.read li{padding:13px 16px;font-size:.95rem;line-height:1.68;color:var(--body);border-bottom:1px solid var(--line);}.read li:last-child{border-bottom:none;}
+
+/* beat trainer */
+.bt-focus{font-size:.92rem;color:var(--body);background:var(--surface2);border-radius:11px;padding:12px 14px;margin-bottom:14px;line-height:1.6;border-left:3px solid var(--mint);}.bt-focus b{color:var(--mint);font-weight:700;}
+.bt-box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 14px;}
+.btsvg{width:100%;max-width:250px;display:block;margin:0 auto 12px;}
+.bt-ctrl{display:flex;flex-direction:column;gap:12px;align-items:center;}
+.bt-meters{display:flex;gap:7px;}
+.btm{padding:8px 17px;border:1px solid var(--line2);background:var(--surface2);border-radius:9px;font-size:.88rem;font-weight:700;color:var(--muted);font-family:var(--mono);}
+.btm.on{background:var(--slate);color:#0a1013;border-color:var(--slate);}
+.bt-play{background:var(--mint);color:#0a1013;font-weight:800;border-radius:10px;padding:11px 34px;font-size:.95rem;}
+.bt-bpm{display:flex;align-items:center;gap:11px;font-size:.82rem;color:var(--muted);font-family:var(--mono);font-weight:600;width:100%;max-width:250px;}
+.bt-bpm input{flex:1;accent-color:var(--mint);}
+.bt-beatn{font-family:var(--mono);font-size:.82rem;color:var(--muted);}.bt-beatn b{color:var(--mint);font-size:1.05rem;font-weight:800;}
+
+/* left hand */
+.bt-lh-toggle{margin-top:2px;font-size:.85rem;color:var(--slate);background:var(--surface2);border:1px solid var(--line2);border-radius:9px;padding:9px 18px;font-weight:700;}
+.bt-lh-toggle.on{background:var(--slate);color:#0a1013;border-color:var(--slate);}
+.lh-box{display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--line);width:100%;max-width:256px;}
+.lh-box.on{display:block;}
+.lh-head{font-size:.85rem;color:var(--slate);font-weight:700;margin-bottom:10px;text-align:center;}.lh-head b{color:var(--text);}
+.lh-main{display:flex;gap:15px;align-items:flex-end;justify-content:center;}
+.lh-track{width:30px;height:100px;background:var(--surface2);border:1px solid var(--line2);border-radius:7px;position:relative;overflow:hidden;flex:0 0 auto;}
+.lh-fill{position:absolute;bottom:0;left:0;right:0;height:8%;background:linear-gradient(180deg,#b6c4ea,#5a7bc0);}
+.lh-fill.flash{background:var(--coral);}
+.lh-exs{display:flex;flex-direction:column;gap:6px;}
+.lhx{font-size:.8rem;padding:7px 12px;border:1px solid var(--line2);background:var(--surface2);border-radius:8px;color:var(--muted);font-weight:600;text-align:left;}
+.lhx.on{border-color:var(--slate);color:var(--slate);background:rgba(162,179,222,.14);}
+.lh-note{font-size:.76rem;color:var(--muted);text-align:center;margin-top:11px;line-height:1.5;}
+
+/* ear */
+.ear-tgt{font-size:.92rem;color:var(--body);background:var(--surface2);border-radius:11px;padding:12px 14px;margin-bottom:14px;border-left:3px solid var(--amber);line-height:1.6;}.ear-tgt b{color:var(--amber);font-weight:700;}
+.ear-q{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:9px;}
+.ear-play{background:var(--raised);border:1px solid var(--line2);border-radius:9px;padding:10px 20px;font-size:.9rem;font-weight:700;color:var(--text);margin-bottom:11px;}
+.ear-opts{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.ear-opt{background:var(--surface2);border:1px solid var(--line2);border-radius:9px;padding:11px 8px;font-size:.88rem;color:var(--body);font-weight:600;}
+.ear-opt.ok{background:rgba(111,233,205,.2);border-color:var(--mint);color:var(--mint);}
+.ear-opt.no{background:rgba(255,133,117,.18);border-color:var(--coral);color:var(--coral);}
+.ear-r{margin-top:10px;font-size:.86rem;color:var(--muted);display:none;line-height:1.55;}.ear-r.on{display:block;}.ear-r b{color:var(--mint);font-weight:700;}
+
+/* quiz */
+.q{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:15px;margin-bottom:11px;}
+.q-tag{font-size:.66rem;font-family:var(--mono);font-weight:700;padding:3px 8px;border-radius:6px;letter-spacing:.03em;}
+.q-tag.mc{background:rgba(162,179,222,.22);color:var(--slate);}.q-tag.sa{background:rgba(245,209,143,.22);color:var(--amber);}
+.q-q{font-size:.98rem;font-weight:700;margin:10px 0 13px;line-height:1.55;color:var(--text);}
+.opt{display:block;width:100%;text-align:left;background:var(--surface2);border:1px solid var(--line2);border-radius:10px;padding:12px 14px;margin-bottom:8px;font-size:.92rem;color:var(--body);font-weight:500;}
+.opt.correct{background:rgba(111,233,205,.2);border-color:var(--mint);color:var(--mint);font-weight:700;}
+.opt.wrong{background:rgba(255,133,117,.18);border-color:var(--coral);color:var(--coral);}.opt.dim{opacity:.45;}
+.sa-in{width:100%;background:var(--surface2);border:1px solid var(--line2);border-radius:10px;padding:12px 14px;font-size:.95rem;color:var(--text);font-family:inherit;}
+.sa-in:focus{outline:none;border-color:var(--amber);}
+.sa-btn{margin-top:9px;background:var(--raised);border:1px solid var(--line2);border-radius:9px;padding:9px 18px;font-size:.86rem;font-weight:700;color:var(--text);}
+.reveal{margin-top:11px;padding:12px 14px;background:var(--surface2);border-radius:10px;border-left:3px solid var(--mint);display:none;}.reveal.on{display:block;}
+.reveal .ans{font-size:.9rem;font-weight:800;color:var(--mint);margin-bottom:5px;}.reveal .exp{font-size:.86rem;color:var(--body);line-height:1.6;}
+.selfmark{margin-top:10px;display:flex;gap:8px;}.selfmark button{flex:1;border-radius:9px;padding:9px;font-size:.85rem;font-weight:700;border:1px solid var(--line2);}
+.selfmark .ok{color:var(--mint);}.selfmark .no{color:var(--coral);}.selfmark button.sel{background:var(--raised);}
+.explain{margin-top:10px;font-size:.86rem;color:var(--body);line-height:1.6;padding-left:12px;border-left:3px solid var(--line2);display:none;}.explain.on{display:block;}
+
+.task{background:rgba(245,209,143,.1);border:1px solid rgba(245,209,143,.3);border-radius:13px;padding:14px 16px;font-size:.94rem;line-height:1.65;color:#f0e3c6;}.task b{color:var(--amber);font-weight:700;}
+.done-btn{display:block;width:100%;background:var(--mint);color:#0a1013;font-size:1rem;font-weight:800;border-radius:12px;padding:15px;margin-top:10px;}
+.done-btn.saved{background:var(--surface2);color:var(--mint);border:1px solid var(--mint);}
+.scoreline{text-align:center;font-size:.86rem;color:var(--muted);font-family:var(--mono);font-weight:600;margin:14px 0 6px;}.scoreline b{color:var(--mint);font-weight:800;}
+.ref-btn{display:block;width:100%;margin-top:18px;background:var(--surface);border:1px solid var(--line2);border-radius:14px;padding:15px;font-size:.98rem;font-weight:700;color:var(--text);text-align:center;}
+.ref-btn b{color:var(--mint);}
+.ref-nav{display:flex;gap:7px;margin-bottom:18px;}
+.ref-nav button{flex:1;padding:9px 4px;border:1px solid var(--line2);background:var(--surface2);border-radius:10px;font-size:.82rem;font-weight:700;color:var(--muted);}
+.ref-nav button.on{background:var(--mint);color:#0a1013;border-color:var(--mint);}
+.ref-cat{font-size:.85rem;font-weight:800;color:var(--slate);margin:18px 0 9px;padding-left:3px;border-left:3px solid var(--slate);padding-left:9px;}
+.ref-list{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:13px;overflow:hidden;}
+.ref-list li{display:flex;gap:12px;padding:12px 15px;border-bottom:1px solid var(--line);font-size:.92rem;line-height:1.6;}
+.ref-list li:last-child{border-bottom:none;}
+.ref-list .term{flex:0 0 36%;font-weight:700;color:var(--text);}
+.ref-list .desc{flex:1;color:var(--body);}
+.lesson-card{background:linear-gradient(135deg,rgba(111,233,205,.1),rgba(162,179,222,.06));border:1px solid var(--line2);border-radius:12px;padding:13px 15px;margin-bottom:12px;}
+.lesson-h{font-size:.92rem;font-weight:800;color:var(--mint);margin-bottom:9px;letter-spacing:-.01em;}
+.lesson-ul{list-style:none;margin:0;padding:0;}
+.lesson-ul li{font-size:.9rem;line-height:1.62;color:var(--body);padding:4px 0 4px 15px;position:relative;}
+.lesson-ul li::before{content:'▪';position:absolute;left:2px;color:var(--mint);font-size:.7rem;top:7px;}
+.cex{background:var(--surface2);border:1px solid var(--line2);border-radius:11px;padding:12px 14px;margin:13px 0;}
+.cex-t{font-size:.87rem;font-weight:800;color:var(--amber);margin-bottom:9px;}
+.cex-btns{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:9px;}
+.cex-b{background:var(--raised);border:1px solid var(--line2);border-radius:8px;padding:8px 14px;font-size:.84rem;font-weight:700;color:var(--text);}
+.cex-b:active{transform:scale(.97);}
+.cex-d{font-size:.85rem;color:var(--body);line-height:1.58;}
+.bk-area{width:100%;min-height:90px;background:var(--surface2);border:1px solid var(--line2);border-radius:10px;padding:11px 12px;font-size:.78rem;font-family:var(--mono);color:var(--body);resize:vertical;word-break:break-all;line-height:1.5;}
+.bk-area:focus{outline:none;border-color:var(--mint);}
+.bk-msg{margin-top:10px;font-size:.86rem;font-weight:600;line-height:1.5;}
+.bk-msg.ok{color:var(--mint);}.bk-msg.no{color:var(--coral);}
+.deep-card{background:linear-gradient(135deg,rgba(162,179,222,.1),rgba(111,233,205,.05));border:1px solid var(--line2);border-radius:12px;padding:13px 15px;font-size:.9rem;line-height:1.62;color:var(--body);}
+.deep-card b{color:var(--slate);font-weight:700;}
+.bk-btns{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+.bk-act{flex:1;min-width:130px;background:var(--surface2);border:1px solid var(--line2);border-radius:9px;padding:11px;font-size:.88rem;font-weight:700;color:var(--text);}
+.bk-act:active{transform:scale(.98);}
+.cmp{text-align:center;padding:22px 6px 8px;}
+.cmp-badge{font-size:2.8rem;margin-bottom:6px;}
+.cmp-day{font-size:.82rem;font-weight:800;color:var(--mint);letter-spacing:.04em;}
+.cmp-t{font-size:1.28rem;font-weight:800;color:var(--text);margin:6px 0 20px;line-height:1.3;}
+.cmp-stats{display:flex;gap:9px;justify-content:center;margin-bottom:18px;}
+.cmp-s{flex:1;background:var(--surface2);border:1px solid var(--line2);border-radius:12px;padding:13px 4px;}
+.cmp-n{font-size:1.1rem;font-weight:800;color:var(--text);}
+.cmp-l{font-size:.71rem;color:var(--muted);margin-top:3px;}
+.cmp-sum{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:12px 14px;font-size:.85rem;color:var(--body);line-height:1.65;text-align:left;margin-bottom:10px;}
+.cmp-sum b{color:var(--mint);}
+.cmp-next{background:linear-gradient(135deg,rgba(162,179,222,.12),rgba(111,233,205,.05));border:1px solid var(--line2);border-radius:11px;padding:12px 14px;font-size:.88rem;color:var(--body);text-align:left;margin-bottom:16px;}
+.cmp-next b{color:var(--slate);}
+.cmp-enc{font-size:.92rem;color:var(--amber);font-weight:600;margin-bottom:18px;}
+.cmp-next-btn{width:100%;margin-top:9px;background:var(--surface2);border:1px solid var(--line2);border-radius:11px;padding:13px;font-size:.92rem;font-weight:700;color:var(--text);}
+.cmp-next-btn:active{transform:scale(.98);}
+/* concept rich */
+.concept{font-size:.96rem;line-height:1.74;color:var(--body);}
+.concept p{margin:0 0 13px;}.concept b{color:var(--text);}
+.concept h4{font-size:.92rem;color:var(--mint);margin:18px 0 9px;font-weight:800;letter-spacing:-.01em;}
+.ctbl{width:100%;border-collapse:collapse;margin:11px 0 15px;font-size:.87rem;}
+.ctbl th{background:var(--surface2);color:var(--mint);text-align:left;padding:9px 11px;font-weight:700;border:1px solid var(--line2);}
+.ctbl td{padding:9px 11px;border:1px solid var(--line);color:var(--body);vertical-align:top;line-height:1.55;}
+.ctbl td:first-child{color:var(--text);font-weight:700;white-space:nowrap;}
+.cnote{font-size:.88rem;color:var(--body);background:var(--surface2);border-left:3px solid var(--amber);border-radius:9px;padding:11px 13px;margin:12px 0;line-height:1.62;}.cnote b{color:var(--amber);}
+.cdia{display:block;width:100%;max-width:330px;margin:14px auto;background:var(--surface2);border:1px solid var(--line);border-radius:11px;padding:10px;}
+/* harmony drill */
+.harm-tgt{font-size:.92rem;color:var(--body);background:var(--surface2);border-radius:11px;padding:12px 14px;margin-bottom:14px;border-left:3px solid var(--mint);line-height:1.6;}.harm-tgt b{color:var(--mint);}
+.harm-box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 14px;text-align:center;}
+.harm-prompt{font-size:1.02rem;font-weight:800;color:var(--text);margin-bottom:12px;}.harm-prompt b{color:var(--mint);}
+.piano{width:100%;max-width:280px;display:block;margin:0 auto 12px;}
+.pk{cursor:pointer;}
+.pkw{fill:#e4eaed;stroke:#8894a0;stroke-width:1;}
+.pkb{fill:#2b3641;stroke:#161d24;stroke-width:1;}
+.pk.sel{fill:var(--slate);}
+.pk.ok{fill:var(--mint);}
+.pk.no{fill:var(--coral);}
+.harm-ctrl{display:flex;gap:8px;justify-content:center;}
+.harm-btn{border-radius:9px;padding:10px 22px;font-size:.9rem;font-weight:800;}
+.harm-chk{background:var(--mint);color:#0a1013;}
+.harm-new{background:var(--surface2);border:1px solid var(--line2);color:var(--text);}
+.harm-r{margin-top:11px;font-size:.88rem;font-weight:600;min-height:1.2em;}.harm-r.ok{color:var(--mint);}.harm-r.no{color:var(--coral);}
+/* ref search */
+.ref-search{position:relative;margin-bottom:16px;}
+.ref-search input{width:100%;padding:12px 14px;background:var(--surface);border:1px solid var(--line2);border-radius:11px;color:var(--text);font-size:.95rem;font-family:inherit;}
+.ref-search input:focus{outline:none;border-color:var(--mint);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="home">
+    <header><h1>이론<b>66</b></h1><span class="sub">지휘 · 하루 1시간</span></header>
+    <div class="prog"><div class="prog-top"><div class="prog-pct" id="pct">0%<small>완료</small></div><div class="prog-stats"><span>연속 <b id="streak">0</b>일</span><span><b id="doneN">0</b>/66일</span></div></div><div class="bar"><i id="barfill" style="width:0"></i></div></div>
+    <div class="today" id="todayCard"></div>
+    <div class="map-h">학습 지도 · 11주 66일</div>
+    <div id="map"></div>
+    <button class="ref-btn" onclick="openRef('sym')">📖 참고 사전 · <b>기호 · 인물 · 구조</b></button>
+    <button class="ref-btn" id="wrongBtn" onclick="openWrong()" style="margin-top:9px">📝 오답 노트 · <b id="wrongN">0</b>문항</button>
+    <button class="ref-btn" onclick="openBackup()" style="margin-top:9px">💾 진도 백업 · 복원</button>
+  </div>
+  <div id="lesson"><button class="back" onclick="goHome()">← 학습 지도로</button><div id="lessonBody"></div></div>
+</div>
+
+<script>
+function mc(q,c,a,e){return{k:'mc',q:q,c:c,a:a,e:e};}
+function sa(q,a,e){return{k:'sa',q:q,a:a,e:e};}
+var CUR=[// ── 1주: 화성 기초 I ──
+{d:1,wk:1,ph:'화성 기초',t:'화음의 종류 — 3·7화음',lead:'화음마다 색과 역할이 달라요. 오늘은 기본 화음 10종을 귀와 손으로 익혀요.',concept:'<p><b>화음</b>은 밑음(근음)에서 <b>3도씩</b> 쌓은 음의 묶음이에요. 3도 둘을 쌓으면 <b>3화음</b>, 하나 더 쌓아 7도까지면 <b>7화음</b>이 됩니다. 어떤 3도(장3도=4반음 / 단3도=3반음)를 어떤 순서로 쌓느냐가 화음의 <b>질(質)</b>과 색을 결정해요.</p><h4>3화음 4종</h4><table class="ctbl"><tr><th>화음</th><th>쌓기</th><th>구성(반음)</th><th>색 · 자리</th></tr><tr><td>장3화음</td><td>장3+단3</td><td>0-4-7</td><td>밝고 안정 · I·IV·V</td></tr><tr><td>단3화음</td><td>단3+장3</td><td>0-3-7</td><td>어둡고 서정 · ii·iii·vi</td></tr><tr><td>증3화음</td><td>장3+장3</td><td>0-4-8</td><td>불안·부유(대칭)</td></tr><tr><td>감3화음</td><td>단3+단3</td><td>0-3-6</td><td>긴장·불안정 · vii°</td></tr></table><h4>7화음 5종</h4><table class="ctbl"><tr><th>화음</th><th>구성(반음)</th><th>색 · 쓰임</th></tr><tr><td>maj7</td><td>0-4-7-11</td><td>세련·부유 · I·IV</td></tr><tr><td>딸림7(7)</td><td>0-4-7-10</td><td>해결 요구 · V</td></tr><tr><td>m7</td><td>0-3-7-10</td><td>부드러운 단 · ii·vi</td></tr><tr><td>m7♭5</td><td>0-3-6-10</td><td>반감7 · ii°·vii</td></tr><tr><td>dim7</td><td>0-3-6-9</td><td>감7 · 대칭 · 고긴장</td></tr></table><p><b>해석 · </b>3화음의 밝기는 <b>3음</b>(장/단)이 가르고, 안정/불안은 <b>5음</b>(완전/증/감)이 가릅니다. 증·감화음은 <b>대칭 구조</b>라 근음이 모호해서 반음계·전조의 경첩으로 자주 쓰여요.</p><div class="cex"><div class="cex-t">🎧 예시 — 화음의 질 (근음 C)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playChord([60,64,67],1.3)">장3화음</button><button class="cex-b" onclick="ac();playChord([60,63,67],1.3)">단3화음</button><button class="cex-b" onclick="ac();playChord([60,64,68],1.3)">증3화음</button><button class="cex-b" onclick="ac();playChord([60,63,66],1.3)">감3화음</button><button class="cex-b" onclick="ac();playChord([60,64,67,71],1.4)">maj7</button><button class="cex-b" onclick="ac();playChord([60,64,67,70],1.4)">딸림7</button></div><div class="cex-d">3음(장/단)이 밝기를, 5음(완전/증/감)이 안정을 가릅니다. 증·감의 부유·긴장을 귀로 구별해보세요.</div></div><div class="cnote"><b>지휘 함의 · </b>화음의 질은 곡의 <b>명암</b>을 정해요. 같은 화음도 어느 층을 끌어올리냐(발란스)로 색이 달라지니, 총보에서 질을 먼저 읽고 색을 조각하세요.</div>',read:[
+'장3화음 1-3-5 (장3+단3): 밝고 안정 · I·IV·V','단3화음 1-♭3-5: 어둡고 서정 · ii·iii·vi','증3화음 1-3-♯5: 불안·부유','감3화음 1-♭3-♭5: 긴장·불안정 · vii°','maj7 1-3-5-7: 세련·부유 / dom7 1-3-5-♭7: 딸림·해결 요구','m7 / m7♭5(반감7) / dim7(감7·대칭)'],
+q:[mc('장3화음의 구성 음정은?',['장3도+단3도','단3도+장3도','장3도+장3도','단3도+단3도'],0,'아래 장3도 위 단3도 = 장3화음. 반대면 단3화음.'),
+sa('딸림7화음(dom7)을 근음 기준 음도로 쓰시오.','1-3-5-♭7','장3화음+단7도. V에 놓여 해결(→I)을 강하게 요구.'),
+mc('감7화음(dim7)의 특징이 아닌 것은?',['모든 음정이 단3도','대칭 구조','강한 긴장','밝고 안정적'],3,'dim7은 단3도 4개가 쌓인 대칭·고긴장 화음.')],
+task:'앱 사전에서 C장·c단·C증·C감 3화음을 눌러 소리 차이를 귀로 구별. maj7/dom7/m7도 비교.'},
+
+{d:2,wk:1,ph:'화성 기초',t:'화성 기능 T–S–D',lead:'모든 화음은 셋 중 하나의 역할을 해요. 이 밀고 당김이 조성음악의 엔진.',concept:'<p>화음은 저마다 <b>역할(기능)</b>이 있어요. 이 역할의 밀고 당김이 조성음악을 굴리는 <b>엔진</b>입니다.</p><table class="ctbl"><tr><th>기능</th><th>대표 화음</th><th>느낌</th><th>경향</th></tr><tr><td>토닉 T</td><td>I · vi</td><td>집 · 안정 · 도착</td><td>어디로든</td></tr><tr><td>서브도미넌트 S</td><td>IV · ii</td><td>떠남 · 준비</td><td>→ D</td></tr><tr><td>도미넌트 D</td><td>V · vii°</td><td>긴장 · 해결 요구</td><td>→ T (강하게)</td></tr></table><svg class="cdia" viewBox="0 0 300 165"><defs><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#a7b4bc"/></marker></defs><path d="M80,100 Q102,54 126,56" fill="none" stroke="#a7b4bc" stroke-width="2" marker-end="url(#ar)"/><path d="M174,56 Q198,54 220,100" fill="none" stroke="#a7b4bc" stroke-width="2" marker-end="url(#ar)"/><path d="M212,126 L90,126" fill="none" stroke="#ff8575" stroke-width="2.6" marker-end="url(#ar)"/><circle cx="60" cy="118" r="26" fill="rgba(111,233,205,.16)" stroke="#6fe9cd" stroke-width="2"/><text x="60" y="124" text-anchor="middle" font-size="18" font-weight="800" fill="#6fe9cd">T</text><circle cx="150" cy="42" r="26" fill="rgba(162,179,222,.16)" stroke="#a2b3de" stroke-width="2"/><text x="150" y="48" text-anchor="middle" font-size="18" font-weight="800" fill="#a2b3de">S</text><circle cx="240" cy="118" r="26" fill="rgba(255,133,117,.16)" stroke="#ff8575" stroke-width="2"/><text x="240" y="124" text-anchor="middle" font-size="18" font-weight="800" fill="#ff8575">D</text><text x="150" y="152" text-anchor="middle" font-size="9.5" fill="#ff8575" font-weight="700">D→T = 가장 강한 해결</text></svg><p><b>해석 · </b>분석의 첫 질문은 늘 <b>"지금 어느 기능인가?"</b>예요. 화음 이름보다 기능이 먼저입니다. 예로 Dm(ii)과 F(IV)는 다른 화음이지만 <b>둘 다 S</b> — 같은 "떠남"의 역할이에요. <b>토니시제이션</b>은 부속화음(V/V 등)으로 잠깐 다른 음을 으뜸음처럼 강조하되 조는 유지하는 것입니다.</p><div class="cex"><div class="cex-t">🎧 예시 — T–S–D 진행 (C장조)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playSeq([[60,64,67],[65,69,72],[67,71,74],[60,64,67]],0.8)">I–IV–V–I</button></div><div class="cex-d">토닉(도미솔) → 서브도미넌트(파라도) → 도미넌트(솔시레) → 토닉. V의 긴장이 I로 풀리는 순간에 귀를 두세요.</div></div><div class="cnote"><b>지휘 함의 · </b>D→T 해결은 곡에서 가장 잦은 <b>긴장→이완</b>이에요. 도미넌트에서 반동을 조이고 토닉 도착에 무게를 실어 "숨을 내려놓게" 그리면 프레이징이 삽니다.</div>',read:[
+'토닉 T: 집·안정·도착 (I·vi)','서브도미넌트 S: 떠남·준비 (IV·ii)','도미넌트 D: 긴장·해결 요구 (V·vii°)','기본 흐름 T→S→D→T = 집→떠남→긴장→귀가','토니시제이션: 부속화음으로 잠깐 다른 음을 으뜸처럼(조는 유지)'],
+q:[mc('IV·ii 화음의 기능은?',['토닉','서브도미넌트','도미넌트','없음'],1,'IV·ii = S(버금딸림). 집을 떠나 움직이기 시작.'),
+sa('조성음악의 기본 화성 흐름을 T·S·D로 쓰시오.','T-S-D-T','집→떠남→긴장→귀가. 긴장이 쌓였다 풀리는 왕복.'),
+mc('토니시제이션이란?',['완전한 전조','잠깐 다른 화음을 가짜 으뜸음처럼 강조','종지를 생략','리듬을 바꿈'],1,'조를 완전히 옮기진 않고 잠깐 강조. 부속화음이 대표 수단.')],
+task:'좋아하는 곡 한 악구를 골라 각 화음이 T·S·D 중 무엇인지 표시해보기.'},
+
+{d:3,wk:1,ph:'화성 기초',t:'종지 (Cadence)',lead:'악구가 어떻게 끝나는가. 문장의 마침표·물음표·쉼표예요.',concept:'<p>악구가 <b>어떻게 끝나는가</b>를 보는 게 종지예요. 문장의 마침표·물음표·쉼표처럼, 종결 방식이 음악의 <b>숨과 구획</b>을 만들어요.</p><table class="ctbl"><tr><th>종지</th><th>진행</th><th>강도</th><th>느낌</th></tr><tr><td>완전정격 PAC</td><td>V→I (근음+소프라노 으뜸)</td><td>★★★</td><td>확실한 마침</td></tr><tr><td>불완전정격 IAC</td><td>V→I (전위·3·5음)</td><td>★★</td><td>약한 마침</td></tr><tr><td>반종지 HC</td><td>…→V</td><td>★</td><td>쉼표·질문</td></tr><tr><td>변격</td><td>IV→I</td><td>★★</td><td>아멘·여운</td></tr><tr><td>위종지</td><td>V→vi</td><td>—</td><td>끝날 듯 안 끝남</td></tr></table><p><b>해석 · </b>PAC는 "완전히 끝났다"는 도착점이라 <b>악절·악장의 경계</b>를 만들어요. 반종지는 선행구 끝에서 "질문"을 남겨 후속구를 부르고, 위종지는 도착을 미뤄 곡을 끌고 갑니다. 종지의 <b>강도 위계</b>를 알아야 어디서 크게, 어디서 살짝 숨 쉴지 정해요.</p><div class="cex"><div class="cex-t">🎧 예시 — 종지 비교 (C장조)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playSeq([[67,71,74],[60,64,67]],0.95)">정격 V→I</button><button class="cex-b" onclick="ac();playSeq([[67,71,74],[69,72,76]],0.95)">위종지 V→vi</button><button class="cex-b" onclick="ac();playSeq([[65,69,72],[60,64,67]],0.95)">변격 IV→I</button></div><div class="cex-d">정격은 확실히 닫히고, 위종지(V→vi)는 끝날 듯 안 끝나며, 변격(IV→I)은 아멘처럼 부드러워요. 종결감의 차이를 들어보세요.</div></div><div class="cnote"><b>지휘 함의 · </b>종지 = 프레이징의 <b>구두점</b>. PAC엔 확실한 커트오프와 호흡, 반종지엔 열린 채 이어지는 제스처. 강도에 따라 쉼의 크기를 차등하세요.</div>',read:[
+'정격 V→I: 가장 확실한 마침. PAC(근음+소프라노 으뜸=최강)/IAC(전위·3·5음=약함)','반종지 HC: V에서 멈춤 = 쉼표·질문','변격 IV→I: 아멘·부드러운 여운','위종지 V→vi: 끝날 듯 안 끝나는 속임수','피카르디 3도: 단조 곡 마지막만 장3화음 = 빛나는 종결'],
+q:[mc('가장 강한 종결감을 주는 종지는?',['반종지','변격종지','완전정격종지(PAC)','위종지'],2,'PAC: 두 화음 근음 위 + 소프라노가 으뜸음. "완전히 끝났다".'),
+sa('V화음에서 멈춰 질문·기대를 남기는 종지 이름은?','반종지 (HC)','다음을 기대하게 함. 악절의 선행구 끝에 흔함.'),
+mc('위종지(기만 종지)의 진행은?',['V→I','IV→I','V→vi','ii→V'],2,'딸림이 I 대신 vi로 빠짐 → 악구를 더 끌고 감.')],
+task:'악보에서 종지 3개를 찾아 종류(정격/반/변격/위)를 표시.'},
+
+{d:4,wk:1,ph:'화성 기초',t:'부가·확장·변화 화음(텐션)',lead:'기본 화음에 색을 더하는 음들. 재즈·낭만의 풍부함이 여기서.',concept:'<p>기본 3·7화음 위에 음을 더 얹어 <b>색과 긴장</b>을 더하는 게 텐션이에요. 재즈·낭만의 풍부함이 여기서 나옵니다.</p><table class="ctbl"><tr><th>종류</th><th>얹는 음</th><th>효과</th></tr><tr><td>6 · add9 · 6/9</td><td>6, 9 (7 없이)</td><td>투명 · 풍성</td></tr><tr><td>9 · 11 · 13</td><td>상위 텐션</td><td>풍성 · 긴장 고조</td></tr><tr><td>7♭9 · 7♯9</td><td>변형 9도</td><td>단조 해결 · 블루지</td></tr><tr><td>7♯11 · 7♭13</td><td>변형 11·13</td><td>부유 · 어두운 딸림</td></tr><tr><td>7alt</td><td>♭9·♯9·♯11·♭13</td><td>최대 긴장 → i</td></tr></table><p><b>해석 · </b>텐션은 화음의 <b>기능은 유지</b>하면서 색만 짙게 해요. 딸림7에 텐션이 많을수록 해결을 향한 긴장이 커집니다. add9·6/9처럼 7 없는 텐션은 "긴장 없는 색"이라 종지의 포근한 여운에 좋아요.</p><div class="cex"><div class="cex-t">🎧 예시 — 딸림7의 긴장 (근음 C)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playChord([60,64,67,70],1.5)">C7</button><button class="cex-b" onclick="ac();playChord([60,64,67,70,61],1.5)">C7♭9</button><button class="cex-b" onclick="ac();playChord([60,64,67,70,66],1.5)">C7♯11</button></div><div class="cex-d">기본 딸림7에서 텐션이 늘수록 긴장이 커지는 걸 들어보세요. 이 긴장이 해결(→I)을 강하게 원해요.</div></div><div class="cnote"><b>지휘 함의 · </b>텐션이 두꺼운 화음일수록 그 <b>불협의 층</b>을 어떻게 발란스할지가 관건. 텐션 음을 살짝 도드라지게 하면 색이 서고, 묻으면 안정돼요.</div>',read:[
+'6/add9/6-9: 7 없이 색만 더함','9·11·13: 딸림 위 상위 텐션(풍성·긴장)','7♭9/7♯9: 단조 해결·블루지','7♯11: 리디안♭7·부유 / 7♭13: 어두운 딸림','7alt(♭9·♯9·♯11·♭13): 최대 긴장 → i (재즈 리하모니)'],
+q:[mc('add9와 6/9의 공통점은?',['7음을 반드시 포함','7 없이 색을 더함','딸림 기능','감화음'],1,'둘 다 7음 없이 9(또는 6·9)만 얹어 투명·풍성.'),
+sa('7alt에 흔히 얹는 변화 텐션 4가지를 쓰시오.','♭9 ♯9 ♯11 ♭13','얼터드 스케일과 짝. i로 강하게 해결.'),
+mc('7♯11에 어울리는 스케일은?',['프리지안','리디안♭7','로크리안','온음음계'],1,'♯11 = 리디안♭7(믹솔리디안 ♯4)의 색.')],
+task:'앱 사전에서 C7·C7♭9·C7alt를 눌러 긴장이 커지는 순서를 귀로 확인.'},
+
+{d:5,wk:1,ph:'화성 기초',t:'전위·자리표(Figured Bass)',lead:'같은 화음도 어느 음이 베이스냐로 무게가 달라져요. 자리표로 읽어요.',concept:'<p>같은 화음도 <b>어느 음이 베이스</b>냐로 무게와 안정감이 달라져요. 이걸 <b>자리표(figured bass)</b>로 읽습니다.</p><table class="ctbl"><tr><th>위치</th><th>베이스</th><th>자리표</th></tr><tr><td>3화음 기본</td><td>근음</td><td>5/3 (생략)</td></tr><tr><td>3화음 1전위</td><td>3음</td><td>6</td></tr><tr><td>3화음 2전위</td><td>5음</td><td>6/4</td></tr><tr><td>7화음 기본</td><td>근음</td><td>7</td></tr><tr><td>7화음 1전위</td><td>3음</td><td>6/5</td></tr><tr><td>7화음 2전위</td><td>5음</td><td>4/3</td></tr><tr><td>7화음 3전위</td><td>7음</td><td>4/2</td></tr></table><p><b>해석 · </b>기본 위치(근음 베이스)가 가장 안정적이고, <b>6/4(2전위)</b>는 불안정해 종지 6/4처럼 해결로 이어져요. 자리표는 <b>베이스 라인을 매끄럽게</b> 만드는 도구 — I → V6 → I는 베이스가 도-시-도로 도약 없이 흐릅니다.</p><div class="cex"><div class="cex-t">🎧 예시 — C장3화음 전위 (베이스 변화)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playChord([60,64,67],1.4)">근음 (5/3)</button><button class="cex-b" onclick="ac();playChord([64,67,72],1.4)">1전위 (6)</button><button class="cex-b" onclick="ac();playChord([67,72,76],1.4)">2전위 (6/4)</button></div><div class="cex-d">베이스가 근음→3음(미)→5음(솔)로 바뀌며 무게가 달라져요. 2전위(6/4)의 불안정함이 해결을 부릅니다.</div></div><div class="cnote"><b>지휘 함의 · </b>베이스는 화성의 <b>토대이자 발란스 기준</b>. 전위로 베이스가 순차로 흐르면 레가토로, 근음이 도약하면 또렷한 착지로 그리세요.</div>',read:[
+'3화음: 기본 5/3, 1전위 6, 2전위 6/4','7화음: 기본 7, 1전위 6/5, 2전위 4/3, 3전위 4/2','베이스가 3음=1전위, 5음=2전위, 7음=3전위','예: 1전위 토닉=I6, 2전위 딸림7=V4/3','베이스 안정성: 토닉은 근음(뿌리)에 두면 가장 안정'],
+q:[mc('3화음 1전위의 자리표는?',['5/3','6','6/4','7'],1,'베이스가 3음일 때 = 6 (I6).'),
+sa('딸림7화음 2전위의 자리표를 쓰시오.','4/3','베이스가 5음. V4/3.'),
+mc('가장 불안정해 다음으로 나아가려는 전위는?',['근음 위치','1전위(6)','2전위(6/4)','상관없음'],2,'6/4는 불안정 → 종지 6/4처럼 해결로 이어짐.')],
+task:'C장조 I·IV·V를 근음·1전위·2전위로 배치해 베이스 라인을 매끄럽게 만들어보기.'},
+
+{d:6,wk:1,ph:'화성 기초',t:'복습 — 화성 기초 I',lead:'1주차를 문제로 다져요. 틀린 건 해당 날로 돌아가 다시.',concept:'<p><b>1주차 종합.</b> 화음의 질 → 기능(T-S-D) → 종지 → 텐션 → 전위. 이 다섯이 <b>화성 읽기의 기본 문법</b>이에요.</p><table class="ctbl"><tr><th>개념</th><th>핵심 질문</th></tr><tr><td>화음의 질</td><td>장/단/증/감? 3·5·7음의 성격은?</td></tr><tr><td>기능</td><td>지금 T·S·D 중 무엇? (집/떠남/긴장)</td></tr><tr><td>종지</td><td>어떻게 끝나나? 강도는?</td></tr><tr><td>텐션</td><td>색을 더하나, 긴장을 더하나?</td></tr><tr><td>전위</td><td>누가 베이스? 안정/불안?</td></tr></table><div class="cnote"><b>복습법 · </b>좋아하는 곡 한 악구를 골라 이 다섯 질문을 한 장에 적어보세요. "화음 이름"이 아니라 "기능과 역할"로 읽는 눈이 화성 분석의 시작이에요.</div>',read:[
+'화음 10종·기능 T-S-D·종지·텐션·자리표를 한 번에 점검','핵심: 기능은 "지금 어디쯤(떠남/긴장/도착)?"','종지는 "어떻게 끝나나", 자리표는 "누가 베이스냐"'],
+q:[mc('S→D→T에서 D의 대표 화음은?',['IV','ii','V','vi'],2,'D=도미넌트=V(vii°). 해결을 강하게 원함.'),
+sa('단조 곡의 마지막만 장3화음으로 밝게 끝내는 것은?','피카르디 3도','어두운 곡의 빛나는 종결.'),
+mc('m7♭5(반감7)의 구성은?',['1-♭3-♭5-♭7','1-♭3-♭5-♭♭7','1-3-5-♭7','1-♭3-5-♭7'],0,'감3화음+단7도. 감7(♭♭7)과 구별.'),
+sa('V→vi 종지의 이름은?','위종지(기만 종지)','끝날 듯 안 끝남.')],
+task:'이번 주 배운 곡 악구에서 기능·종지·전위를 모두 한 장에 정리(요약노트).'},
+// ── 2주: 화성 기초 II ──
+{d:7,wk:2,ph:'화성 기초',t:'화성 시퀀스',lead:'같은 화음 패턴이 한 칸씩 규칙적으로 이동. 계단처럼 방향·추진력을 만들어요.',concept:'<p><b>시퀀스</b>는 같은 화성 <b>모형</b>이 일정 간격으로 규칙적으로 반복 이동하는 것이에요. <b>방향</b>(상행/하행)과 <b>간격</b>(5도·3도·2도)이 색과 추진력을 결정합니다.</p><table class="ctbl"><tr><th>시퀀스</th><th>근음 이동</th><th>특징</th></tr><tr><td>하행 5도</td><td>5도씩 ↓</td><td>가장 강한 추진 (비발디·바흐)</td></tr><tr><td>상행 5도</td><td>5도씩 ↑</td><td>떠오름 · 덜 흔함</td></tr><tr><td>하행 5-6 (로마네스카)</td><td>4↓5↑ 교대</td><td>부드러운 하행 (파헬벨)</td></tr><tr><td>하행 3도</td><td>3도씩 ↓</td><td>포근 · 노래하는</td></tr><tr><td>로살리아</td><td>온음 위 통째 반복</td><td>기계적 반복(별칭)</td></tr></table><svg class="cdia" viewBox="0 0 320 96"><defs><marker id="a7" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#a7b4bc"/></marker></defs><circle cx="42" cy="40" r="20" fill="rgba(111,233,205,.14)" stroke="#6fe9cd" stroke-width="1.6"/><text x="42" y="46" text-anchor="middle" font-size="13" font-weight="800" fill="#6fe9cd">vi</text><circle cx="134" cy="40" r="20" fill="rgba(111,233,205,.14)" stroke="#6fe9cd" stroke-width="1.6"/><text x="134" y="46" text-anchor="middle" font-size="13" font-weight="800" fill="#6fe9cd">ii</text><circle cx="226" cy="40" r="20" fill="rgba(111,233,205,.14)" stroke="#6fe9cd" stroke-width="1.6"/><text x="226" y="46" text-anchor="middle" font-size="13" font-weight="800" fill="#6fe9cd">V</text><circle cx="300" cy="40" r="20" fill="rgba(111,233,205,.14)" stroke="#6fe9cd" stroke-width="1.6"/><text x="300" y="46" text-anchor="middle" font-size="13" font-weight="800" fill="#6fe9cd">I</text><path d="M64,40 L112,40" stroke="#a7b4bc" stroke-width="2" marker-end="url(#a7)"/><path d="M156,40 L204,40" stroke="#a7b4bc" stroke-width="2" marker-end="url(#a7)"/><path d="M246,40 L280,40" stroke="#ff8575" stroke-width="2.4" marker-end="url(#a7)"/><text x="160" y="82" text-anchor="middle" font-size="9.5" fill="#75818b">근음이 5도씩 하행 (A→D→G→C) · 가장 강한 추진</text></svg><p><b>해석 · </b>시퀀스는 <b>모형의 첫 등장</b>만 잡으면 나머지가 예측돼요. 보통 <b>2~3회</b> 반복하며 긴장을 적재하다 종지·정점으로 풀립니다. 하행 5도가 조성 진행의 엔진인 이유는 매 단계가 V→I의 연쇄이기 때문이에요.</p><div class="cex"><div class="cex-t">🎧 예시 — 하행 5도 시퀀스 (C장조)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playSeq([[69,72,76],[62,65,69],[67,71,74],[60,64,67]],0.72)">vi–ii–V–I</button></div><div class="cex-d">근음이 A→D→G→C로 5도씩 하행해요. 매 단계가 V→I의 연쇄라 강한 추진이 느껴집니다.</div></div><div class="cnote"><b>지휘 함의 · </b>시퀀스 구간은 <b>하나의 긴 추진선</b>. 매 단계 살짝 밀어 목표로 몰아가되, 기계적으로 똑같이 반복하지 말고 방향성을 실으세요.</div>',read:[
+'하행 5도: 근음 5도씩 하강(E-A-D-G-C). 가장 강력한 추진(비발디·바흐)','상행 5도: 덜 흔함·떠오름','하행 5-6/로마네스카/파헬벨 계열: 부드러운 하행','하행 3도: 포근·노래하는','로살리아: 악구 통째 온음 위로 = 값싼 반복'],
+q:[mc('가장 강력한 추진력을 주는 시퀀스는?',['상행 5도','하행 5도','하행 3도','로살리아'],1,'근음이 5도씩 굴러 내려감. 조성 진행의 엔진.'),
+sa('악구를 통째로 온음 위로 그대로 반복해 "값싼 반복"으로 불리는 것은?','로살리아','너무 기계적이라 별칭이 됨.'),
+mc('시퀀스를 알아보는 핵심 단서는?',['같은 모양이 한 칸씩 이동','화음이 사라짐','박자가 바뀜','조가 바뀜'],0,'방향(상/하)과 간격(5도/3도)이 색을 결정.')],
+task:'파헬벨 카논 진행을 쳐보고 하행 5-6(로마네스카)의 흐름을 귀로 느끼기.'},
+
+{d:8,wk:2,ph:'화성 기초',t:'갈랑 스키마타',lead:'18세기의 관용 표현. 언어의 숙어처럼 정해진 패턴이 곡의 벽돌.',concept:'<p>18세기 갈랑 양식의 <b>관용 표현</b>이에요. 언어의 숙어처럼, 정해진 <b>베이스+선율 정형</b>들이 곡을 짜는 벽돌이 됩니다. 스키마를 알면 그 악구가 곡의 <b>어느 위치</b>(개시·응답·발전·종지)인지 바로 읽혀요.</p><table class="ctbl"><tr><th>스키마</th><th>베이스(음도)</th><th>쓰임·위치</th></tr><tr><td>로마네스카</td><td>1-5-6-3</td><td>장중한 개시</td></tr><tr><td>프린너</td><td>4-3-2-1</td><td>응답 · 마무리</td></tr><tr><td>폰테(다리)</td><td>딸림 지속 하강</td><td>재현부 진입</td></tr><tr><td>몬테(산)</td><td>한 음씩 상승</td><td>발전 · 긴장 고조</td></tr><tr><td>인두지오</td><td>딸림 앞 지연</td><td>도착 뜸들이기</td></tr></table><p><b>해석 · </b>스키마타는 그 시대의 <b>문법 숙어</b>라, 개별 화음보다 "이 정형이 무슨 역할을 하는가"를 봐요. 개시 정형(로마네스카)은 무게 있게, 응답 정형(프린너)은 정리하듯 — 위치가 곧 연주 방식입니다.</p><div class="cex"><div class="cex-t">🎧 예시 — 로마네스카 (베이스 1-5-6-3)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playSeq([[60,64,67],[55,59,62],[57,60,64],[52,55,59]],0.85)">I–V–vi–iii</button></div><div class="cex-d">파헬벨 카논과 친척인 장중한 개시 정형. 베이스가 도-솔-라-미로 내려가는 걸 들어보세요.</div></div><div class="cnote"><b>지휘 함의 · </b>스키마의 <b>기능</b>(개시/응답/발전)에 따라 프레이징·무게를 배분하세요. 몬테는 밀어 올리고, 프린너는 내려놓듯.</div>',read:[
+'로마네스카: 베이스 1-5-6-3, 장중한 개시','프린너: 받아치는 응답, 베이스 4-3-2-1','폰테(샘): 한 음 아래 반복 / 몬테(산): 한 음 위 상승','폰테(다리): 딸림 길게 깔고 건너감(재현부 직전)','인두지오: 딸림 앞 뜸들여 도착 지연'],
+q:[mc('개시부에 자주 쓰이는, 베이스 1-5-6-3 정형은?',['프린너','로마네스카','몬테','인두지오'],1,'파헬벨 카논과 친척인 장중한 펼침.'),
+sa('악구를 정리·마무리하는 응답 정형(베이스 4-3-2-1)의 이름은?','프린너','"이제 마무리 짓자"는 손짓.'),
+mc('긴장을 고조시키며 한 음씩 위로 쌓는 정형은?',['폰테','몬테','콰이에스첸차','메이어'],1,'몬테=산. 상승으로 긴장 고조.')],
+task:'모차르트 소나타 K.545 첫 악구에서 마이어/프린너 정형을 찾아보기.'},
+
+{d:9,wk:2,ph:'화성 기초',t:'반음계 화성 I',lead:'온음계 밖의 음을 빌려 색을 더해요. 부속·차용·나폴리·증6.',concept:'<p>온음계(도레미) <b>밖의 음</b>을 빌려 색과 긴장을 더하는 화성이에요. 기능은 대개 유지하되 그늘·경이를 만듭니다.</p><table class="ctbl"><tr><th>화음</th><th>구성·특징</th><th>효과</th></tr><tr><td>부속화음 V/V</td><td>딸림의 딸림 (이차 딸림)</td><td>잠깐 다른 음을 으뜸처럼(토니시제이션)</td></tr><tr><td>차용화음(모달 믹스처)</td><td>반대 모드에서 빌림(장조에 iv·♭VI)</td><td>그늘 · 애수</td></tr><tr><td>나폴리 6화음 ♭II⁶</td><td>2음 반음↓ 장3화음(1전위)</td><td>종지 직전 어둠</td></tr><tr><td>증6화음 It·Fr·Ger</td><td>바깥으로 반음 확장</td><td>V(또는 I6/4)로 강하게 해결</td></tr></table><p><b>해석 · </b>이 화음들은 대부분 <b>도미넌트 또는 그 준비</b>로 기능해요. 특히 독일 증6(Ger⁶)은 소리가 <b>V⁷과 같아서</b> 이명동음 전조의 문이 됩니다. 나폴리·증6은 종지를 극적으로 물들이는 장치예요.</p><div class="cex"><div class="cex-t">🎧 예시 — 부속화음 V/V — 토니시제이션</div><div class="cex-btns"><button class="cex-b" onclick="ac();playSeq([[62,66,69,72],[67,71,74],[60,64,67]],0.8)">D7→G→C</button></div><div class="cex-d">D7(V/V)이 G를 잠깐 으뜸음처럼 들리게 해요(F♯의 신선함). 조는 C 그대로인데 색이 열립니다.</div></div><div class="cnote"><b>지휘 함의 · </b>반음계 화음의 <b>낯선 색</b>이 스치는 순간을 살짝 도드라지게, 해결 화음에서 이완. 색의 대비가 드라마입니다.</div>',read:[
+'부속화음 V/V: 딸림의 딸림 — 잠깐 다른 데 들른 신선함','차용화음: 반대 모드에서 빌림(장조에 단조 iv·♭VI) = 그늘','나폴리 6화음 ♭II⁶: 2음 반음 내린 장3화음, 종지 직전 어둠','증6화음 It·Fr·Ger: 바깥으로 강하게 해결. Ger⁶=V⁷ 소리'],
+q:[mc('V/V(부속화음)의 효과는?',['조를 완전히 바꿈','어떤 음을 잠깐 으뜸음처럼 강조','리듬 변화','종지 생략'],1,'토니시제이션 — 잠깐 다른 데 들른 신선함.'),
+sa('2음을 반음 내려 만든, 종지 직전의 어두운 장3화음(보통 6화음)은?','나폴리 6화음 (♭II⁶)','베토벤이 즐겨 씀.'),
+mc('독일 증6화음(Ger⁶)이 이명동음 전조에 쓰이는 이유는?',['소리가 V⁷과 같아서','근음이 없어서','감화음이라','장화음이라'],0,'Ger⁶ ≡ V⁷ 소리 → 같은 문을 다른 방향으로.')],
+task:'C장조에서 V/V(=D7)를 넣어 G를 잠깐 으뜸음처럼 들리게 쳐보기.'},
+
+{d:10,wk:2,ph:'화성 기초',t:'반음계 화성 II',lead:'더 진한 색 — 중3도·공통음 감7·옴니버스.',concept:'<p>더 진한 반음계 색 — <b>기능화성만으로는 안 풀리는</b> 진행들이에요.</p><table class="ctbl"><tr><th>화음/진행</th><th>특징</th></tr><tr><td>반음계 중3도(Chromatic Mediant)</td><td>3도 관계·공통음 적음·색 확 다름 (영화적 경이)</td></tr><tr><td>공통음 감7 (ct°7)</td><td>한 음 공유 감7 · 장식적 긴장</td></tr><tr><td>옴니버스</td><td>바깥 성부가 반음 양방향으로 미끄러짐</td></tr></table><p><b>해석 · </b>C장 ↔ E장처럼 3도 떨어지고 색이 확 열리는 진행은 딸림으로 설명이 안 돼요. 그래서 <b>신리만 변형이론(PLR, 45일)</b>이 이 자리를 메웁니다 — 공통음을 고정점으로, 움직이는 한 음을 변화의 주역으로 보는 관점이에요.</p><div class="cex"><div class="cex-t">🎧 예시 — 반음계 중3도 (C장 → E장)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playSeq([[60,64,67],[64,68,71]],1.1)">C → E</button></div><div class="cex-d">3도 떨어지고 공통음(미)만 남아 색이 확 열리는 "경이". 영화음악의 신비로운 전환이에요.</div></div><div class="cnote"><b>지휘 함의 · </b>중3도 전환은 <b>색의 문이 갑자기 열리는</b> 순간. 음색·발란스를 확 바꿔 그 경이를 전하세요.</div>',read:[
+'반음계 중3도(Chromatic Mediant): 3도 관계·공통음 적고 색 확 다름(영화의 경이)','공통음 감7 ct°7: 한 음 공유 감7, 장식적 긴장','옴니버스: 바깥성부 반음 양방향으로 미끄러짐','이런 화성은 기능(T-S-D)만으론 안 풀림 → 신리만(45일)로 이어짐'],
+q:[mc('C장 ↔ E장처럼 3도 떨어지고 색이 확 다른 관계는?',['부속화음','반음계 중3도','나폴리','시퀀스'],1,'영화음악의 "경이·신비" 전환.'),
+sa('한 음을 공유하며 장식적으로 끼어드는 감7화음의 이름은?','공통음 감7화음 (ct°7)','장식적 긴장을 더함.'),
+mc('반음계 중3도 진행을 기능 화성으로 설명하기 어려운 이유는?',['너무 단순해서','딸림으로 안 풀리는 3도 이동이라','종지가 없어서','조성이 없어서'],1,'그래서 신리만 변형이론(PLR)이 보완.')],
+task:'영화음악에서 3도로 확 열리는 전환을 하나 찾아 어떤 감정인지 메모.'},
+
+{d:11,wk:2,ph:'화성 기초',t:'전조 (Modulation)',lead:'곡 중간에 조가 바뀌는 것. 어떻게 갈아타느냐가 드라마의 분기점.',concept:'<p>곡 중간에 <b>조</b>가 바뀌는 것. 어떻게 갈아타느냐가 드라마의 <b>분기점</b>이에요.</p><table class="ctbl"><tr><th>방식</th><th>방법</th><th>느낌</th></tr><tr><td>온음계 피벗</td><td>공통화음을 경첩으로</td><td>가장 매끄러움</td></tr><tr><td>반음계</td><td>부속·증6로</td><td>갑자기</td></tr><tr><td>이명동음</td><td>같은 소리 다른 이름(Ger⁶=V⁷)</td><td>먼 조 순간이동</td></tr><tr><td>공통음</td><td>한 음만 남기고 점프</td><td>신비</td></tr><tr><td>직접(악구)</td><td>준비 없이 새 조 시작</td><td>팝 후렴 반음 상승</td></tr></table><svg class="cdia" viewBox="0 0 320 108"><rect x="8" y="26" width="120" height="52" rx="9" fill="rgba(111,233,205,.12)" stroke="#6fe9cd" stroke-width="1.5"/><text x="68" y="57" text-anchor="middle" font-size="13" font-weight="800" fill="#6fe9cd">조 A</text><rect x="192" y="26" width="120" height="52" rx="9" fill="rgba(255,133,117,.12)" stroke="#ff8575" stroke-width="1.5"/><text x="252" y="57" text-anchor="middle" font-size="13" font-weight="800" fill="#ff8575">조 B</text><circle cx="160" cy="52" r="26" fill="rgba(162,179,222,.18)" stroke="#a2b3de" stroke-width="1.8"/><text x="160" y="49" text-anchor="middle" font-size="9" fill="#a2b3de">공통</text><text x="160" y="60" text-anchor="middle" font-size="9" fill="#a2b3de">화음</text><path d="M128,52 L136,52" stroke="#a7b4bc" stroke-width="2"/><path d="M184,52 L190,52" stroke="#a7b4bc" stroke-width="2"/><text x="160" y="98" text-anchor="middle" font-size="9.5" fill="#75818b">공통화음을 경첩 삼아 매끄럽게 (피벗 전조)</text></svg><p><b>해석 · </b>전조를 들을 때는 "<b>얼마나 매끄러운가(피벗) vs 갑작(직접)</b>"으로 드라마 강도를 읽어요. <b>근친조</b>(5도권 이웃·나란한조)일수록 자연스럽고, 먼 조일수록 충격입니다. 피벗 화음은 두 조 모두에 속해 경첩 역할을 해요.</p><div class="cex"><div class="cex-t">🎧 예시 — 피벗 전조 C장조 → G장조</div><div class="cex-btns"><button class="cex-b" onclick="ac();playSeq([[60,64,67],[69,72,76],[62,66,69,72],[67,71,74]],0.85)">C→Am→D7→G</button></div><div class="cex-d">C(I) → Am(경첩: C의 vi = G의 ii) → D7(G의 V) → G. Am을 경첩 삼아 매끄럽게 G조로 넘어가요.</div></div><div class="cnote"><b>지휘 함의 · </b>전조 지점에서 <b>무게중심·색</b>을 옮기세요. 피벗은 부드럽게 넘기고, 직접 전조는 새 조의 첫 화음을 또렷이 선언하듯.</div>',read:[
+'온음계적(피벗): 공통화음을 경첩으로 — 가장 매끄러움','반음계적: 부속·증6로 갑자기','이명동음: 같은 소리 다른 이름(Ger⁶=V⁷) — 먼 조 순간이동','공통음: 한 음만 남기고 점프','직접·악구: 준비 없이 새 조 시작(팝 후렴 반음 올리기)'],
+q:[mc('가장 매끄러운 전조 방식은?',['직접 전조','이명동음','온음계적 피벗','공통음'],2,'두 조 공통화음을 경첩으로 자연스레 갈아탐.'),
+sa('팝 마지막 후렴을 반음 올리는 것은 어떤 전조?','직접(악구) 전조','준비 없이 새 조로 시작.'),
+mc('Ger⁶을 V⁷로 재해석해 먼 조로 가는 전조는?',['피벗','이명동음','공통음','직접'],1,'같은 소리, 다른 이름 = 순간이동.')],
+task:'아는 곡에서 조가 바뀌는 지점을 찾아 어떤 방식(매끄러움/갑작)인지 표시.'},
+
+{d:12,wk:2,ph:'화성 기초',t:'지속음·오스티나토 + 복습',lead:'반복되는 토대 위에 짓기. 그리고 화성 기초 II 점검.',concept:'<p>반복되는 <b>토대</b> 위에 음악을 짓는 기법이에요. 그리고 2주차 전체를 정리합니다.</p><table class="ctbl"><tr><th>기법</th><th>구조</th><th>효과</th></tr><tr><td>페달 포인트</td><td>한 음 길게, 위 화음 자유</td><td>긴장 적재(도미넌트 페달)</td></tr><tr><td>오스티나토</td><td>음형을 집요하게 반복</td><td>최면·축적 (볼레로)</td></tr><tr><td>파사칼리아</td><td>베이스 선율 반복</td><td>변주의 토대</td></tr><tr><td>샤콘느</td><td>화성 순환 반복</td><td>변주의 토대</td></tr></table><div class="cex"><div class="cex-t">🎧 예시 — 도미넌트 페달</div><div class="cex-btns"><button class="cex-b" onclick="ac();playSeq([[43,67,71,74],[43,65,69,72],[43,67,71,74],[43,60,64,67]],0.7)">솔 페달 + 위 화음</button></div><div class="cex-d">베이스에 딸림음(솔)을 길게 깔고 위 화음이 자유롭게 움직여요. 해결 직전 긴장이 적재됩니다.</div></div><div class="cnote"><b>2주차 복습 · </b>시퀀스(방향·간격) → 스키마타(관용 정형) → 반음계(부속·차용·나폴리·증6·중3도) → 전조(피벗~직접) → 지속음. 화성의 <b>색과 움직임</b>을 다루는 도구들이에요.</div>',read:[
+'페달 포인트: 한 음 길게, 위 화음 자유(토닉/도미넌트 페달)','오스티나토: 음형을 집요하게 반복(볼레로)','바소 오스티나토/그라운드: 베이스 반복 + 윗성부 자유 변주','파사칼리아(베이스 선율 반복) vs 샤콘느(화성 순환 반복)'],
+q:[mc('도착 직전 긴장을 적재하는 지속음은?',['토닉 페달','도미넌트 페달','이중 페달','없음'],1,'딸림음을 길게 깔아 해결 직전 긴장.'),
+sa('베이스 선율(그라운드) 자체의 반복이 핵심인 바로크 변주형식은?','파사칼리아','샤콘느는 화성 순환이 핵심.'),
+mc('시퀀스 하행 5도의 근음 이동은?',['3도씩','5도씩','2도씩','반음씩'],1,'복습: 하행 5도 = 가장 강한 추진.')],
+task:'토닉 페달 위에 화음 3~4개를 바꿔 쳐보고 "버티는 긴장감"을 느끼기.'},
+
+// ── 3주: 선율·대위 ──
+{d:13,wk:3,ph:'선율·대위',t:'동기·선율 전개',lead:'짧은 씨앗(동기) 하나가 변형되며 곡 전체로 자라요.',concept:'<p>짧은 씨앗인 <b>동기</b> 하나가 여러 방식으로 <b>변형</b>되며 곡 전체로 자라요. <b>반복</b>은 통일성을, <b>변형</b>은 발전을 줍니다.</p><table class="ctbl"><tr><th>변형</th><th>설명</th></tr><tr><td>반복</td><td>그대로 다시</td></tr><tr><td>시퀀스</td><td>음정은 유지, 위치만 이동</td></tr><tr><td>전위(inversion)</td><td>방향 뒤집기 (올라가던 걸 내려가게)</td></tr><tr><td>역행(retrograde)</td><td>거꾸로 (끝에서 처음으로)</td></tr><tr><td>확대(augmentation)</td><td>음가를 2배로 늘림</td></tr><tr><td>축소(diminution)</td><td>음가를 절반으로</td></tr><tr><td>분할(fragmentation)</td><td>동기의 일부만 떼어 발전</td></tr></table><p><b>해석 · </b>베토벤 5번의 "따따따딴" 하나가 곡 전체를 짓는 원리예요. 마무리엔 특징을 조금씩 덜어내는 <b>청산(liquidation)</b>으로 긴장을 풀어요. "이 선율이 아까 그 동기의 무슨 변형인가?"를 늘 물으세요.</p><div class="cex"><div class="cex-t">🎧 예시 — 동기와 변형 (선율)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playMel([60,62,64],0.4)">원형 (도레미)</button><button class="cex-b" onclick="ac();playMel([60,58,56],0.4)">전위</button><button class="cex-b" onclick="ac();playMel([64,62,60],0.4)">역행</button><button class="cex-b" onclick="ac();playMel([60,62,64],0.85)">확대</button></div><div class="cex-d">도-레-미(원형) → 방향 뒤집기(전위) → 거꾸로(역행) → 음가 2배(확대). 같은 씨앗의 변형을 들어보세요.</div></div><div class="cnote"><b>지휘 함의 · </b>동기가 <b>어디서 어떻게 변형</b>되는지 알면 그 순간을 부각할 수 있어요. 확대는 넓게, 축소는 조이며 그 성격을 몸짓으로.</div>',read:[
+'변형: 반복·시퀀스·전위(방향 뒤집기)·역행(거꾸로)·확대(늘림)·축소(줄임)·분할','청산(쇤베르크): 특징 덜어내며 마무리','전개적 변주(브람스): 조금씩 계속 바꿈','포르트슈피눙: 짧은 동기를 실 잣듯 길게(바로크)'],
+q:[mc('음정 방향을 위아래로 뒤집는 변형은?',['역행','전위','확대','분할'],1,'전위=inversion. 올라가던 걸 내려가게.'),
+sa('음가를 2배로 늘려 동기를 느리게 펼치는 변형은?','확대 (Augmentation)','축소는 반대(음가 절반).'),
+mc('베토벤 5번 "따따따딴"처럼 한 동기로 곡을 키우는 원리는?',['우연성','동기 전개','아이소리듬','헤테로포니'],1,'작은 동기를 여러 방식으로 변형·발전.')],
+task:'베토벤 5번 1악장 첫 동기가 어떻게 변형되는지 3군데 찾아 표시.'},
+
+{d:14,wk:3,ph:'선율·대위',t:'악구 구조',lead:'선율이 어떻게 문장처럼 짜이는가 — 악절·문장·하이퍼미터.',concept:'<p>선율이 <b>문장</b>처럼 짜이는 방식이에요. 두 대표 틀 — 악절과 문장 — 을 구별하는 게 프레이징의 기초입니다.</p><table class="ctbl"><tr><th>틀</th><th>구조</th><th>느낌</th></tr><tr><td>악절(Period)</td><td>선행구(반종지) + 후속구(정격종지)</td><td>질문 → 대답</td></tr><tr><td>문장(Sentence)</td><td>기본악상 → 반복 → 전개·종지</td><td>제시 → 몰아 마침</td></tr><tr><td>하이퍼미터</td><td>마디들의 상위 강·약 주기(보통 4마디)</td><td>큰 박·호흡 단위</td></tr></table><svg class="cdia" viewBox="0 0 320 104"><text x="160" y="18" text-anchor="middle" font-size="10" fill="#a7b4bc">악절(Period) = 질문 + 대답</text><rect x="12" y="30" width="140" height="40" rx="9" fill="rgba(162,179,222,.14)" stroke="#a2b3de" stroke-width="1.5"/><text x="82" y="55" text-anchor="middle" font-size="12" font-weight="700" fill="#a2b3de">선행구 (질문)</text><rect x="168" y="30" width="140" height="40" rx="9" fill="rgba(111,233,205,.14)" stroke="#6fe9cd" stroke-width="1.5"/><text x="238" y="55" text-anchor="middle" font-size="12" font-weight="700" fill="#6fe9cd">후속구 (대답)</text><text x="82" y="92" text-anchor="middle" font-size="10" fill="#ff8575" font-weight="700">반종지 HC ↗</text><text x="238" y="92" text-anchor="middle" font-size="10" fill="#6fe9cd" font-weight="700">정격종지 PAC ✓</text></svg><p><b>해석 · </b>악절은 <b>대칭적 질문·대답</b>(4+4), 문장은 <b>앞은 짧게 두 번, 뒤는 길게 몰아</b>가는 비대칭이에요. 8마디를 만나면 먼저 이 둘 중 무엇인지 판별하면 어디서 숨 쉬고 어디로 몰지가 보여요.</p><div class="cnote"><b>지휘 함의 · </b>선행구 끝(반종지)은 <b>열린 채</b> 이어지는 제스처로, 후속구 끝(정격)은 <b>닫는</b> 커트오프로. 하이퍼미터의 큰 박을 몸으로 느끼며 프레이징하세요.</div>',read:[
+'악절(Period): 선행구(질문·반종지) + 후속구(답·정격종지)','문장(Sentence): 기본악상→반복→전개·종지(앞 짧게 두 번, 뒤 몰아 마침)','하이퍼미터: 마디들이 모여 상위 강·약 주기(보통 4마디=큰 박)','캐플린 형식기능(32일)과 직결'],
+q:[mc('선행구가 반종지로 묻고 후속구가 정격종지로 답하는 구조는?',['문장','악절','시퀀스','하이퍼미터'],1,'Period = 질문+대답 한 쌍.'),
+sa('마디들이 모여 이루는 큰 강·약 주기(보통 4마디)를 뭐라 하나?','하이퍼미터','"큰 박". 프레이징·호흡의 단위.'),
+mc('문장(Sentence)의 전형적 구조는?',['질문+대답','기본악상→반복→전개·종지','반복만','종지만'],1,'앞은 짧게 두 번, 뒤는 길게 몰아 마침.')],
+task:'가곡 한 곡의 첫 8마디가 악절인지 문장인지 판별.'},
+
+{d:15,wk:3,ph:'선율·대위',t:'비화성음 I',lead:'화음에 안 속한 음이 선율의 표정을 만들어요. 오늘은 경과·보조·계류.',concept:'<p>화음에 <b>속하지 않는 음</b>이 어떻게 들어왔다 빠지는가가 선율의 표정을 만들어요. <b>접근·해결 방식</b>과 <b>박 위치</b>로 종류가 갈립니다. 오늘은 경과·보조·계류.</p><table class="ctbl"><tr><th>비화성음</th><th>접근→해결</th><th>박</th><th>느낌</th></tr><tr><td>경과음</td><td>순차 → 순차(같은 방향)</td><td>약박</td><td>매끄럽게 지나감</td></tr><tr><td>보조음</td><td>순차 → 순차(되돌아옴)</td><td>약박</td><td>옆집에 잠깐</td></tr><tr><td>계류음 ★</td><td>앞 화음 붙듦 → 순차 하행</td><td>강박</td><td>불협의 찡함</td></tr></table><p><b>해석 · </b><b>계류음</b>이 핵심이에요. <b>준비(앞 화음 음 유지) → 걸림(강박에서 불협) → 해결(순차 하행)</b>의 3단계로, 4-3·7-6·9-8 유형이 대표적. 합창 종지의 찡한 순간이 바로 이 계류예요. 경과·보조는 약박의 장식이라 가볍게 흐릅니다.</p><div class="cex"><div class="cex-t">🎧 예시 — 계류음 4–3 해결</div><div class="cex-btns"><button class="cex-b" onclick="ac();playSeq([[67,72,74],[67,71,74]],1.15)">Gsus4 → G</button></div><div class="cex-d">4음(도)이 강박에 걸렸다가 3음(시)으로 순차 하행 해결. 걸림→해결의 찡한 순간이에요.</div></div><div class="cnote"><b>지휘 함의 · </b>계류음의 <b>걸림</b>에 살짝 무게를, <b>해결</b>에 이완을 주면 그 표현이 살아요. 경과·보조는 흐름을 끊지 말고 지나가게.</div>',read:[
+'경과음: 두 화음음 사이 순차로 지나감(약박) — 매끄럽게','보조음: 옆음 갔다 되돌아옴(약박) — 옆집에 잠깐','계류음 ★: 앞 화음 붙듦→강박 불협→순차 하행 해결(4-3·7-6·9-8)','계류음 3단계: 준비→걸림→해결. 합창의 찡한 순간'],
+q:[mc('강박에서 불협으로 걸렸다 순차 하행으로 푸는 비화성음은?',['경과음','보조음','계류음','선행음'],2,'준비→걸림→해결. 표현의 핵심.'),
+sa('두 화음음 사이를 순차로 지나가며 빈칸을 채우는 약박 음은?','경과음','도-(레)-미의 "레".'),
+mc('계류음의 대표 걸림 유형이 아닌 것은?',['4-3','7-6','9-8','5-1'],3,'4-3·7-6·9-8·2-3(베이스)이 대표.')],
+task:'합창곡 종지에서 계류음(걸렸다 풀리는 음) 하나를 찾아 3단계 표시.'},
+
+{d:16,wk:3,ph:'선율·대위',t:'비화성음 II',lead:'전타·이탈·선행·자유음. 각각 다른 표정.',concept:'<p>나머지 비화성음 — 각기 다른 표정을 만들어요.</p><table class="ctbl"><tr><th>비화성음</th><th>접근→해결</th><th>박</th><th>느낌</th></tr><tr><td>전타음(앞꾸밈)</td><td>도약 → 순차</td><td>강박</td><td>탄식·한숨</td></tr><tr><td>이탈음</td><td>순차 → 도약(반대)</td><td>약박</td><td>디뎠다 도망</td></tr><tr><td>선행음</td><td>순차/도약 → 유지</td><td>약박</td><td>도착 한 박 먼저</td></tr><tr><td>지연음</td><td>유지 → 순차 상행</td><td>강박</td><td>이끔음의 늦은 해결</td></tr></table><p><b>해석 · </b><b>전타음</b>은 준비 없이 강박에 도약으로 나타나 순차로 풀리는 애잔한 음(모차르트의 한숨)이에요. <b>지연음</b>은 계류음과 원리가 같지만 <b>위로(상행)</b> 풀려 종지에서 이끔음이 으뜸음으로 늦게 올라갈 때 씁니다.</p><div class="cex"><div class="cex-t">🎧 예시 — 전타음 (앞꾸밈)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playSeq([[60,64,65],[60,64,64]],1.0)">F(앞꾸밈) → E</button></div><div class="cex-d">강박에 도약으로 들어온 F가 E로 순차 해결 — 준비 없는 탄식의 강박음이에요.</div></div><div class="cnote"><b>지휘 함의 · </b>전타음(강박 한숨)은 <b>기대듯 얹었다 떨구는</b> 제스처로. 선행음은 도착을 미리 예고하니 다음 박을 준비하는 신호로 읽으세요.</div>',read:[
+'전타음(앞꾸밈): 강박에 도약으로 들어와 순차 해결, 준비 없음 — 탄식·한숨','이탈음: 순차로 들어와 반대 방향 도약(약박) — 한 발 디뎠다 도망','선행음: 다음 화음 음 미리 당김(약박) — 도착 한 박 먼저','지연음: 계류음의 상행 해결 버전(이끔음→으뜸)'],
+q:[mc('준비 없이 강박에 도약으로 나타나 "탄식"을 주는 음은?',['경과음','전타음','보조음','선행음'],1,'모차르트의 애잔한 강박음.'),
+sa('계류음과 원리는 같지만 위(상행)로 푸는 비화성음은?','지연음 (Retardation)','종지에서 이끔음이 으뜸음으로 늦게 올라갈 때.'),
+mc('순차로 들어와 반대 방향으로 도약해 빠지는 음은?',['이탈음','계류음','전타음','경과음'],0,'옆으로 디뎠다 훌쩍 건너뜀(약박).')],
+task:'모차르트 느린 악장에서 전타음(강박 한숨)을 찾아 표시.'},
+
+{d:17,wk:3,ph:'선율·대위',t:'대위·모방·캐논',lead:'독립 선율 둘 이상이 규칙 있게 얽히는 기술.',concept:'<p>둘 이상의 <b>독립 선율</b>이 규칙 있게 얽히는 기술이에요. 각 선율이 살아 있으면서도 어울리게 짜는 것이 대위법입니다.</p><table class="ctbl"><tr><th>기법</th><th>설명</th></tr><tr><td>캐논</td><td>선행을 후행이 시간차로 모방 (돌림노래)</td></tr><tr><td>반행(전위) 캐논</td><td>위아래를 뒤집어 따라감 (거울)</td></tr><tr><td>역행 캐논</td><td>거꾸로 따라감 (게걸음)</td></tr><tr><td>스트레토</td><td>진입 간격을 좁혀 겹침 (절정)</td></tr><tr><td>전위 대위법</td><td>상하 성부를 바꿔도 성립 (8·10·12도)</td></tr></table><svg class="cdia" viewBox="0 0 320 104"><text x="160" y="16" text-anchor="middle" font-size="10" fill="#a7b4bc">캐논 = 시간차 모방(돌림노래)</text><rect x="16" y="30" width="250" height="24" rx="6" fill="rgba(111,233,205,.14)" stroke="#6fe9cd" stroke-width="1.3"/><text x="24" y="47" font-size="10" font-weight="700" fill="#6fe9cd">성부 1 (선행) ▶ 주제…</text><rect x="66" y="62" width="250" height="24" rx="6" fill="rgba(162,179,222,.14)" stroke="#a2b3de" stroke-width="1.3"/><text x="74" y="79" font-size="10" font-weight="700" fill="#a2b3de">성부 2 (후행) ▶ 같은 주제…</text><line x1="66" y1="30" x2="66" y2="86" stroke="#75818b" stroke-dasharray="3 3"/><text x="70" y="100" font-size="9" fill="#75818b">← 한 마디 뒤 진입(시간차)</text></svg><p><b>해석 · </b>대위의 목표는 <b>수평(각 선율의 노래됨)</b>과 <b>수직(동시에 울릴 때의 어울림)</b>을 동시에 만족시키는 것. 스트레토는 주제 진입을 바짝 좁혀 긴박감을 쌓아요.</p><div class="cex"><div class="cex-t">🎧 예시 — 모방 (주제 + 응답)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playMel([60,62,64,65,67],0.34)">주제</button><button class="cex-b" onclick="ac();playMel([67,69,71,72,74],0.34)">응답 (5도 위)</button></div><div class="cex-d">응답은 주제를 5도 위에서 받아요. 실제 캐논은 이 둘이 시간차로 겹쳐 울립니다.</div></div><div class="cnote"><b>지휘 함의 · </b>모방 <b>진입</b>을 큐로 또렷이 짚어 주면 청중이 "지금 저 성부가 주제를 받았다"를 들어요. 각 성부의 독립성을 발란스로 살리세요.</div>',read:[
+'캐논: 선행을 후행이 시간차로 모방(돌림노래)','반행(거울)/역행(게걸음)/확대·축소 캐논','모방: 느슨한 모방 / 스트레토: 진입 간격 좁혀 절정','전위 대위법: 상하 성부 바꿔도 성립(8·10·12도)'],
+q:[mc('선율의 위아래를 뒤집어 따라가는 캐논은?',['역행 캐논','반행(전위) 캐논','확대 캐논','무한 캐논'],1,'거울 캐논. 올라가면 내려감.'),
+sa('푸가 절정에서 주제 진입 간격을 바짝 좁혀 겹치는 기법은?','스트레토','"좁힘". 긴박감을 만듦.'),
+mc('상하 성부를 서로 바꿔도 음악이 성립하게 짜는 기술은?',['정선율','전위 대위법','정량 캐논','포부르동'],1,'이중·삼중 대위(8·10·12도 전위).')],
+task:'"Frère Jacques"를 2성부 돌림노래로 겹쳐 불러 캐논을 체험.'},
+
+{d:18,wk:3,ph:'선율·대위',t:'푸가 + 복습',lead:'모방 대위의 꽃, 푸가. 그리고 선율·대위 점검.',concept:'<p><b>푸가</b>는 모방 대위의 꽃이에요. 하나의 주제가 여러 성부를 오가며 짜입니다. 그리고 3주차를 정리합니다.</p><table class="ctbl"><tr><th>용어</th><th>뜻</th></tr><tr><td>주제(Subject)</td><td>첫 제시 선율</td></tr><tr><td>응답(Answer)</td><td>5도 위에서 받음 (실음/조성)</td></tr><tr><td>대주제(Countersubject)</td><td>주제에 늘 붙는 대선율</td></tr><tr><td>간주부(Episode)</td><td>주제 없이 잇는 경과</td></tr><tr><td>스트레토</td><td>주제 겹침으로 절정</td></tr></table><div class="cnote"><b>3주차 복습 · </b>동기 전개(변형) → 악구 구조(악절/문장) → 비화성음(경과·보조·계류·전타·이탈·선행·지연) → 대위·캐논 → 푸가. <b>선율이 짜이고 얽히는</b> 원리들이에요.</div>',read:[
+'푸가 용어: 주제(Subject)·응답(5도 위, 실음/조성)·대주제·간주부','페달·스트레토로 절정','복습: 동기 변형·악구 구조·비화성음·캐논','종족 대위법(1~5종, 푹스)·정선율(빌려온 고정선율)'],
+q:[mc('푸가에서 주제를 5도 위에서 받는 것은?',['대주제','응답','간주부','스트레토'],1,'Answer. 실음(Real)/조성(Tonal)으로 나뉨.'),
+sa('푸가에서 주제 없이 이어주는 경과 구간의 이름은?','간주부 (Episode)','주제 사이를 잇는 구간.'),
+mc('경과음의 박 위치는?',['강박','약박','상관없음','첫 박만'],1,'복습: 경과·보조·이탈=약박, 계류·전타=강박.'),
+sa('대위를 얹는 토대가 되는 빌려온 고정 선율은?','정선율 (Cantus firmus)','흔히 성가.')],
+task:'바흐 인벤션 한 곡에서 주제가 다른 성부로 모방되는 지점을 찾기.'},
+// ── 4주: 리듬·짜임새 ──
+{d:19,wk:4,ph:'리듬·짜임새',t:'리듬 기법 I',lead:'박·리듬이 규칙과 어긋나며 추진력을 만들어요.',concept:'<p>박·리듬이 규칙(<b>박자</b>)과 어떻게 <b>어긋나는가</b>가 추진력과 긴장을 만들어요. 어긋남이 곧 에너지입니다.</p><table class="ctbl"><tr><th>기법</th><th>설명</th><th>효과</th></tr><tr><td>당김음(싱코페이션)</td><td>약박을 강조</td><td>추진 · 재즈감</td></tr><tr><td>헤미올라</td><td>3박 두 마디를 2박 세 덩어리로(2:3)</td><td>바로크 종지 · 왈츠</td></tr><tr><td>폴리리듬</td><td>다른 박자 그룹 동시(3 대 2)</td><td>긴장 · 복합</td></tr><tr><td>확대·축소</td><td>리듬 통째 느리게/빠르게</td><td>변형 · 발전</td></tr></table><svg class="cdia" viewBox="0 0 320 118"><text x="160" y="15" text-anchor="middle" font-size="10" fill="#a7b4bc">헤미올라 = 같은 6박을 다르게 묶기 (2:3)</text><rect x="10" y="46" width="46" height="30" rx="4" fill="var(--surface2)" stroke="#75818b"/><text x="33" y="66" text-anchor="middle" font-size="12" font-weight="700" fill="#dbe4e8">1</text><rect x="60" y="46" width="46" height="30" rx="4" fill="var(--surface2)" stroke="#75818b"/><text x="83" y="66" text-anchor="middle" font-size="12" font-weight="700" fill="#dbe4e8">2</text><rect x="110" y="46" width="46" height="30" rx="4" fill="var(--surface2)" stroke="#75818b"/><text x="133" y="66" text-anchor="middle" font-size="12" font-weight="700" fill="#dbe4e8">3</text><rect x="160" y="46" width="46" height="30" rx="4" fill="var(--surface2)" stroke="#75818b"/><text x="183" y="66" text-anchor="middle" font-size="12" font-weight="700" fill="#dbe4e8">4</text><rect x="210" y="46" width="46" height="30" rx="4" fill="var(--surface2)" stroke="#75818b"/><text x="233" y="66" text-anchor="middle" font-size="12" font-weight="700" fill="#dbe4e8">5</text><rect x="260" y="46" width="46" height="30" rx="4" fill="var(--surface2)" stroke="#75818b"/><text x="283" y="66" text-anchor="middle" font-size="12" font-weight="700" fill="#dbe4e8">6</text><path d="M10,40 L156,40" stroke="#6fe9cd" stroke-width="2"/><path d="M160,40 L306,40" stroke="#6fe9cd" stroke-width="2"/><text x="83" y="34" text-anchor="middle" font-size="9" fill="#6fe9cd">정상: 3+3</text><text x="233" y="34" text-anchor="middle" font-size="9" fill="#6fe9cd"> </text><path d="M10,82 L106,82" stroke="#ff8575" stroke-width="2"/><path d="M110,82 L206,82" stroke="#ff8575" stroke-width="2"/><path d="M210,82 L306,82" stroke="#ff8575" stroke-width="2"/><text x="160" y="98" text-anchor="middle" font-size="9.5" fill="#ff8575" font-weight="700">헤미올라: 2+2+2</text></svg><p><b>해석 · </b><b>헤미올라</b>는 같은 6박을 3+3(정상)에서 2+2+2(헤미올라)로 <b>재해석</b>하는 거예요. 바로크·왈츠에서 <b>종지 직전</b>에 자주 나타나 "브레이크를 밟듯" 마무리를 예고합니다.</p><div class="cnote"><b>지휘 함의 · </b>헤미올라 구간은 3박 곡이라도 <b>2박으로 느껴</b> 지휘하세요. 당김음은 약박의 무게를 살려 추진을 놓치지 않게.</div>',read:[
+'당김음: 약박 강조로 어긋남 — 추진·재즈감','헤미올라: 3박 2마디를 2박 3덩어리로(2:3) — 바로크 종지·왈츠','교차/폴리리듬: 다른 박자 그룹 동시(3 대 2)','확대·축소: 리듬 통째 느리게/빠르게'],
+q:[mc('3박 두 마디를 2박 세 덩어리로 재해석하는 것은?',['당김음','헤미올라','폴리리듬','아이소리듬'],1,'2:3 재해석. 바로크 종지·왈츠에서 흔함.'),
+sa('센박 대신 약박을 강조해 리듬을 어긋나게 하는 기법은?','당김음(싱코페이션)','추진력·재즈감.'),
+mc('3 대 2처럼 다른 박자 그룹이 동시에 울리는 것은?',['헤미올라','폴리리듬','당김음','확대'],1,'교차리듬/폴리리듬.')],
+task:'왈츠 종지에서 헤미올라(2:3)를 손뼉으로 쳐보기.'},
+
+{d:20,wk:4,ph:'리듬·짜임새',t:'리듬 기법 II',lead:'중세부터 현대까지 — 아이소·가산·메트릭 모듈레이션.',concept:'<p>중세부터 현대까지의 리듬 조직 방식들이에요.</p><table class="ctbl"><tr><th>기법</th><th>설명</th></tr><tr><td>아이소리듬</td><td>탈레아(반복 리듬형)+콜로르(반복 음형)를 따로 겹침 (중세)</td></tr><tr><td>가산 리듬</td><td>2+2+3처럼 불규칙 묶음을 더함 (발칸·현대)</td></tr><tr><td>메트릭 모듈레이션</td><td>음표를 매개로 템포를 매끄럽게 바꿔치기 (엘리엇 카터)</td></tr><tr><td>리듬 변위</td><td>같은 패턴을 박 위치만 밀어 어긋나게</td></tr></table><p><b>해석 · </b><b>가산 리듬</b>은 균등한 박이 아니라 작은 묶음(2·3)을 더해 만들어요. 7/8 = 2+2+3처럼요. <b>메트릭 모듈레이션</b>은 셋잇단의 한 음을 새 박으로 삼아 템포를 자연스럽게 갈아탑니다.</p><div class="cnote"><b>지휘 함의 · </b>가산 리듬(7/8=2+2+3)은 <b>묶음 단위</b>로 크게 지휘하세요 — 낱박이 아니라 2·2·3의 세 덩어리로. 그래야 연주자가 그루브를 탑니다.</div>',read:[
+'아이소리듬: 반복 리듬형(탈레아)+반복 음형(콜로르) 따로 겹침(중세)','가산 리듬: 2+2+3 불규칙 묶음(발칸·현대)','메트릭 모듈레이션(카터): 음표 매개로 템포 매끄럽게 바꿔치기','리듬 변위: 같은 패턴을 박 위치만 밀어 어긋나게'],
+q:[mc('셋잇단의 한 음을 새 박으로 삼아 템포를 바꾸는 기법은?',['아이소리듬','메트릭 모듈레이션','가산 리듬','헤미올라'],1,'엘리엇 카터. 음표를 매개로 템포 전환.'),
+sa('2+2+3처럼 불규칙 묶음을 더해 박을 만드는 것은?','가산 리듬 (Additive rhythm)','발칸·현대음악.'),
+mc('중세 기법으로 탈레아와 콜로르를 따로 돌려 겹치는 것은?',['가산 리듬','아이소리듬','폴리리듬','당김음'],1,'반복 리듬형+반복 음형.')],
+task:'7/8(2+2+3)을 손뼉으로 두 마디 쳐보기.'},
+
+{d:21,wk:4,ph:'리듬·짜임새',t:'짜임새 (Texture)',lead:'성부들이 어떤 관계로 얽히는가. 발란스 설계의 출발.',concept:'<p>성부(층)들이 서로 <b>어떤 관계로 얽히는가</b>예요. 이걸 알아야 "어느 성부를 들리게 할지"인 발란스를 설계해요.</p><table class="ctbl"><tr><th>짜임새</th><th>구조</th><th>예</th></tr><tr><td>모노포니</td><td>선율 하나 (반주 없음)</td><td>그레고리오 성가</td></tr><tr><td>호모포니</td><td>주선율 + 화음 반주</td><td>가곡 · 찬송가</td></tr><tr><td>폴리포니</td><td>독립 선율 둘 이상 얽힘</td><td>바흐 푸가</td></tr><tr><td>헤테로포니</td><td>같은 선율을 각자 조금씩 다르게</td><td>민속 합주</td></tr></table><svg class="cdia" viewBox="0 0 320 150"><text x="160" y="14" text-anchor="middle" font-size="10" fill="#a7b4bc">짜임새 4종 — 성부가 얽히는 방식</text><text x="45" y="34" text-anchor="middle" font-size="9" fill="#6fe9cd" font-weight="700">모노포니</text><path d="M12,52 Q30,44 48,52 T84,50" fill="none" stroke="#6fe9cd" stroke-width="2"/><text x="127" y="34" text-anchor="middle" font-size="9" fill="#a2b3de" font-weight="700">호모포니</text><path d="M94,48 Q112,40 130,48 T166,46" fill="none" stroke="#a2b3de" stroke-width="2"/><line x1="98" y1="62" x2="162" y2="62" stroke="#75818b" stroke-width="1.5" stroke-dasharray="5 3"/><line x1="98" y1="70" x2="162" y2="70" stroke="#75818b" stroke-width="1.5" stroke-dasharray="5 3"/><text x="45" y="98" text-anchor="middle" font-size="9" fill="#f5d18f" font-weight="700">폴리포니</text><path d="M12,116 Q30,106 48,116 T84,112" fill="none" stroke="#f5d18f" stroke-width="1.8"/><path d="M12,128 Q34,136 52,126 T84,130" fill="none" stroke="#f5d18f" stroke-width="1.8" opacity=".7"/><text x="127" y="98" text-anchor="middle" font-size="9" fill="#ff8575" font-weight="700">헤테로포니</text><path d="M94,116 Q112,108 130,116 T166,114" fill="none" stroke="#ff8575" stroke-width="1.8"/><path d="M94,120 Q114,110 132,120 T166,118" fill="none" stroke="#ff8575" stroke-width="1.8" opacity=".6" stroke-dasharray="2 2"/></svg><p><b>해석 · </b>한 곡은 짜임새가 <b>계속 바뀌어요</b> — 호모포니로 시작해 발전부에서 폴리포니로 조밀해지듯. "지금 이 부분은 호모? 폴리?"를 늘 물으면 주선율과 반주의 위계가 보입니다.</p><div class="cnote"><b>지휘 함의 · </b>짜임새 파악 = <b>발란스 설계</b>. 호모포니는 주선율을 띄우고, 폴리포니는 각 성부의 진입을 큐로 살려 독립성을 들려주세요.</div>',read:[
+'모노포니: 선율 하나(옥타브 유니즌 포함)','호모포니: 주선율+화음 반주 / 코랄(동음형 SATB)','폴리포니: 독립 선율 둘+ 얽힘(푸가)','헤테로포니: 같은 선율을 각자 조금씩 다르게','한 곡 안에서 계속 바뀜 → "지금 호모/폴리?" 늘 의식'],
+q:[mc('주선율 하나 + 화음 반주 짜임새는?',['모노포니','호모포니','폴리포니','헤테로포니'],1,'대부분의 가요·가곡·찬송가.'),
+sa('독립 선율 둘 이상이 동시에 얽히는 짜임새는?','폴리포니(다성)','바흐 푸가·돌림노래. 대위법으로 만듦.'),
+mc('짜임새를 파악하는 것이 지휘에 중요한 이유는?',['템포 결정','어느 성부를 들리게 할지(발란스)','조성 파악','종지 찾기'],1,'발란스 = 지금 어느 층을 들리게 할까.')],
+task:'좋아하는 곡 한 구간의 짜임새(호모/폴리)를 판별하고 주선율 악기를 표시.'},
+
+{d:22,wk:4,ph:'리듬·짜임새',t:'화성 리듬·화성색',lead:'화음이 바뀌는 속도와 배치의 색. 표현의 숨은 축.',concept:'<p>화음이 <b>바뀌는 속도</b>(화성 리듬)와 <b>배치의 색</b>(보이싱)은 표현의 숨은 축이에요.</p><table class="ctbl"><tr><th>요소</th><th>내용</th></tr><tr><td>화성 리듬</td><td>화음 교체 속도 — 느림=장중, 빠름=긴장. 종지 직전 가속</td></tr><tr><td>밀집/개방 보이싱</td><td>뭉침·두꺼움 vs 투명·공간감</td></tr><tr><td>음역</td><td>저음역 밀집=탁함(머드) → 넓게 벌려야 명료</td></tr><tr><td>음색선율</td><td>같은 음을 악기 바꿔가며 = 색이 곧 선율(쇤베르크)</td></tr></table><svg class="cdia" viewBox="0 0 320 108"><text x="160" y="14" text-anchor="middle" font-size="10" fill="#a7b4bc">화성 리듬 = 화음이 바뀌는 속도</text><text x="12" y="40" font-size="9" fill="#6fe9cd" font-weight="700">느림 (장중)</text><rect x="12" y="46" width="144" height="22" rx="4" fill="rgba(111,233,205,.2)" stroke="#6fe9cd"/><rect x="160" y="46" width="144" height="22" rx="4" fill="rgba(162,179,222,.2)" stroke="#a2b3de"/><text x="84" y="61" text-anchor="middle" font-size="9" fill="#dbe4e8">화음 1</text><text x="232" y="61" text-anchor="middle" font-size="9" fill="#dbe4e8">화음 2</text><text x="12" y="88" font-size="9" fill="#ff8575" font-weight="700">빠름 (긴장·가속)</text><rect x="12" y="94" width="70" height="10" rx="3" fill="rgba(255,133,117,.2)" stroke="#ff8575"/><rect x="86" y="94" width="70" height="10" rx="3" fill="rgba(255,133,117,.2)" stroke="#ff8575"/><rect x="160" y="94" width="70" height="10" rx="3" fill="rgba(255,133,117,.2)" stroke="#ff8575"/><rect x="234" y="94" width="70" height="10" rx="3" fill="rgba(255,133,117,.2)" stroke="#ff8575"/></svg><p><b>해석 · </b><b>화성 리듬</b>은 곡의 호흡 속도예요. 느린 화성은 넓고 장중하게, 빠른 화성은 활발·긴장되게 들려요. 종지 직전에 화음 교체가 빨라지며 도착으로 몰아가는 것이 흔한 문법입니다.</p><div class="cex"><div class="cex-t">🎧 예시 — 화성 리듬 (느림 vs 빠름)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playSeq([[60,64,67],[60,64,67],[67,71,74],[67,71,74]],0.5)">느림</button><button class="cex-b" onclick="ac();playSeq([[60,64,67],[65,69,72],[67,71,74],[57,60,64]],0.5)">빠름</button></div><div class="cex-d">느린 화성은 장중하게, 빠른 화성은 활발·긴장되게 들려요. 종지 직전엔 흔히 빨라집니다.</div></div><div class="cnote"><b>지휘 함의 · </b>화성 리듬의 <b>가속</b>을 느끼면 종지로 몰아가는 추진을 몸으로 표현할 수 있어요. 보이싱의 밀집/개방은 발란스로 그 색을 조각하세요.</div>',read:[
+'화성 리듬: 화음 바뀌는 속도 — 느림=장중, 빠름=긴장. 종지 직전 가속','밀집(close)=뭉침/두꺼움, 개방(open)=투명/공간감','음역: 저음역 밀집=탁함 → 넓게 벌려야 명료','음색선율(Klangfarben): 같은 음을 악기 바꿔가며 = 음색이 곧 선율'],
+q:[mc('종지 직전에 화성 리듬이 흔히 어떻게 되나?',['느려짐','가속','정지','상관없음'],1,'화음 교체가 빨라지며 도착으로 몰아감.'),
+sa('음들을 한 옥타브 안에 모아 뭉치고 진하게 만드는 보이싱은?','밀집(close) 보이싱','개방은 넓게 벌려 투명.'),
+mc('음색 변화 자체가 선율이 되게 하는 기법은?',['오스티나토','음색선율(Klangfarbenmelodie)','헤미올라','페달'],1,'쇤베르크 Op.16-3. 화성은 정지, 색만 이동.')],
+task:'같은 화음을 밀집/개방으로 쳐서 색 차이를 귀로 확인.'},
+
+{d:23,wk:4,ph:'리듬·짜임새',t:'복습 — 리듬·짜임새',lead:'문제로 다지기.',concept:'<p><b>4주차 정리.</b> 리듬의 어긋남과 성부의 얽힘 — 음악의 <b>시간과 층</b>을 다루는 도구들이에요.</p><table class="ctbl"><tr><th>개념</th><th>핵심</th></tr><tr><td>당김음·헤미올라·폴리</td><td>박자와의 어긋남 = 추진·긴장</td></tr><tr><td>가산·아이소·메트릭모듈</td><td>불규칙 묶음·템포 전환</td></tr><tr><td>짜임새 4종</td><td>모노·호모·폴리·헤테로</td></tr><tr><td>화성 리듬·보이싱</td><td>화음 속도 + 배치의 색</td></tr></table><div class="cnote"><b>복습법 · </b>한 곡에서 리듬 기법 2개 + 짜임새 변화 1곳을 찾아 표시해보세요. 다음은 <b>1개월 모의고사</b>로 1~4주를 종합 점검합니다.</div>',read:['당김음·헤미올라·폴리·아이소·가산 점검','짜임새 4종 + 화성 리듬·보이싱 점검'],
+q:[mc('헤미올라의 비율은?',['3:4','2:3','1:2','4:5'],1,'3박 두 마디 = 2박 세 덩어리.'),
+sa('같은 선율을 각자 조금씩 다르게 연주하는 짜임새는?','헤테로포니','"하나인 듯 여럿".'),
+mc('저음역에서 화음을 밀집으로 쌓으면?',['맑아짐','탁해짐(머드)','커짐','사라짐'],1,'저음은 넓게 벌려야 명료.'),
+sa('약박 강조로 어긋남을 만드는 기법은?','당김음','추진력·재즈감.')],
+task:'한 곡에서 리듬 기법 2개 + 짜임새 변화 1곳을 찾아 요약.'},
+
+{d:24,wk:4,ph:'모의고사',t:'1개월 모의고사',lead:'화성·선율·리듬 종합 점검. 60% 이상이면 통과.',concept:'<p><b>1개월 종합 점검</b>이에요. 1~4주에 배운 <b>화성 · 선율 · 리듬 · 짜임새</b> 전 범위에서 출제됩니다. 아래 체크리스트로 스스로 준비도를 확인하고, 문제를 푼 뒤 <b>60% 미만</b>이면 약한 주제로 돌아가세요.</p><table class="ctbl"><tr><th>주차</th><th>꼭 알아야 할 것</th></tr><tr><td>1주 화성</td><td>화음의 질 · T-S-D · 종지 · 텐션 · 전위</td></tr><tr><td>2주 화성II</td><td>시퀀스 · 스키마타 · 반음계 · 전조 · 지속음</td></tr><tr><td>3주 선율</td><td>동기 전개 · 악절/문장 · 비화성음 · 대위 · 푸가</td></tr><tr><td>4주 리듬</td><td>당김음·헤미올라 · 가산리듬 · 짜임새 4종 · 화성리듬</td></tr></table><div class="cnote"><b>시험 팁 · </b>틀린 문제는 그냥 넘기지 말고 <b>해당 Day로 돌아가 개념·표를 다시</b> 보세요. 반복 오답 주제 2개를 메모해 다음 주 복습 목록에 넣으면 효과적이에요.</div>',read:['1~4주 전체에서 출제','틀린 문제는 해당 날로 돌아가 복습'],
+q:[mc('V→I 완전정격 종지(PAC)의 조건은?',['전위 가능','소프라노가 3음','두 화음 근음+소프라노 으뜸음','반종지 포함'],2,'가장 강한 종결감.'),
+sa('부속화음 V/V의 기능적 목적을 한마디로.','V(딸림)를 잠깐 으뜸음처럼 강조','토니시제이션.'),
+mc('계류음의 3단계 순서는?',['걸림→준비→해결','준비→걸림→해결','해결→준비→걸림','준비→해결→걸림'],1,'앞 화음 붙듦→강박 불협→순차 하행.'),
+sa('독립 선율들이 얽히는 짜임새 + 그걸 만드는 기술 이름은?','폴리포니 / 대위법','기술=대위법.'),
+mc('메트릭 모듈레이션을 정립한 작곡가는?',['쇤베르크','엘리엇 카터','바르토크','리게티'],1,'음표 매개 템포 전환.')],
+task:'모의고사 오답을 정리하고, 약한 주제 2개를 다음 주 복습 목록에 적기.'},
+
+// ── 5주: 표현·음색 ──
+{d:25,wk:5,ph:'표현·음색',t:'셈여림',lead:'소리 크기 변화가 화성 긴장과 맞물려 다이내믹 아치를 만들어요.',concept:'<p>소리 크기 변화는 화성 긴장과 맞물려 하나의 <b>다이내믹 아치</b>를 이뤄요. 낱개 셈여림이 아니라 "정점을 향한 곡선"으로 설계하는 게 핵심입니다.</p><table class="ctbl"><tr><th>기법</th><th>설명</th></tr><tr><td>계단식(테라스)</td><td>단으로 뚝뚝 f→p 급전환 (바로크)</td></tr><tr><td>메사 디 보체</td><td>한 음을 &lt;&gt;로 부풀렸다 줄임 (성악·관악)</td></tr><tr><td>만하임 크레셴도</td><td>로켓·롤러·한숨 — 극적 점층</td></tr><tr><td>로시니 크레셴도</td><td>반복→단축→악기 추가→음역 상승</td></tr><tr><td>기능적 크레셴도</td><td>정점으로 향하는 다이내믹 아치</td></tr></table><svg class="cdia" viewBox="0 0 320 122"><text x="160" y="14" text-anchor="middle" font-size="10" fill="#a7b4bc">다이내믹 아치 — 정점을 향한 하나의 곡선</text><line x1="20" y1="100" x2="305" y2="100" stroke="#75818b" stroke-width="1"/><path d="M22,96 C90,90 150,32 214,30 C250,29 280,60 300,88" fill="none" stroke="#6fe9cd" stroke-width="2.4"/><line x1="214" y1="30" x2="214" y2="100" stroke="#ff8575" stroke-dasharray="3 3"/><circle cx="214" cy="30" r="4" fill="#ff8575"/><text x="22" y="114" font-size="9" fill="#a2b3de">p 시작</text><text x="214" y="24" text-anchor="middle" font-size="9" fill="#ff8575" font-weight="700">ff 정점</text><text x="300" y="114" text-anchor="end" font-size="9" fill="#a2b3de">p 이완</text><text x="214" y="114" text-anchor="middle" font-size="8.5" fill="#75818b">약 2/3 지점</text></svg><p><b>해석 · </b>표현은 <b>하나의 큰 곡선</b>이에요. 어디서 시작해 어디가 정점이고 어디서 이완하는지를 먼저 정해야, 국지적 셈여림이 그 아치에 종속됩니다. 정점은 보통 <b>후반 2/3 지점</b>에 두어야 자연스러워요.</p><div class="cnote"><b>지휘 함의 · </b>다이내믹은 <b>왼손</b>의 몫. 손바닥 높이로 음량을 은유하며 아치를 그리세요. 정점을 너무 일찍 소모하면 김이 빠집니다.</div>',read:[
+'계단식: 단으로 뚝뚝(바로크)','메사 디 보체: 한 음 <>로 부풀렸다 줄임','만하임: 크레셴도·로켓·롤러·한숨·그랜드 포즈','로시니 크레셴도: 반복→단축→악기 추가→음역 상승','기능적 크레셴도: 정점으로 향하는 다이내믹 아치'],
+q:[mc('점점이 아니라 단으로 뚝뚝 바뀌는 바로크 셈여림은?',['메사 디 보체','계단식','만하임 크레셴도','로시니'],1,'f→p 급전환.'),
+sa('한 음을 여리게 시작해 부풀렸다 다시 줄이는 것(<>)은?','메사 디 보체','성악·관악의 호흡 미학.'),
+mc('로시니 크레셴도의 특징이 아닌 것은?',['악구 반복','점점 단축','악기 추가','음역 하강'],3,'음역을 위로 올려 달아오름.')],
+task:'한 악구에서 정점을 향하는 다이내믹 아치를 그려보기(어디서 시작·정점·이완).'},
+
+{d:26,wk:5,ph:'표현·음색',t:'아고긱·템포',lead:'음량이 아니라 시간의 흔들림으로 표현. 리만이 정립.',concept:'<p>음량이 아니라 <b>시간의 흔들림</b>으로 표현하는 방식이에요. 리만이 정립했습니다.</p><table class="ctbl"><tr><th>수단</th><th>설명</th></tr><tr><td>아고긱 악센트</td><td>음을 살짝 길게 늘여 강세 (음량 없이 도드라지게)</td></tr><tr><td>템포 루바토</td><td>선율만 신축(쇼팽) / 전체 신축</td></tr><tr><td>점진 변화</td><td>rit · rall · accel · allargando</td></tr><tr><td>급격 변화</td><td>ritenuto · stringendo · a tempo</td></tr><tr><td>뤼시 규칙</td><td>상행=조임, 하행=늦춤</td></tr></table><p><b>해석 · </b><b>아고긱 악센트</b>는 셋잇단 첫 음이나 정점 음을 미세하게 끌어 "음량 없이 도드라지게" 하는 거예요. 루바토는 "훔친 시간을 같은 마디 안에서 되갚는다"는 원리 — 선율이 밀면 어딘가서 당겨 균형을 맞춥니다.</p><div class="cnote"><b>지휘 함의 · </b>rit는 박을 <b>세분</b>해 안정시키고, 아고긱은 <b>익투스 타이밍</b>을 미세하게 늘려 표현하세요. 셈여림(어제)과 아고긱은 섞지 말고 하나씩 써야 효과가 삽니다.</div>',read:[
+'아고긱 악센트: 음을 살짝 길게 늘여 강세(음량 없이 도드라지게)','템포 루바토: 선율만 신축(쇼팽) / 전체 루바토','점진: rit·rall / accel / allargando','급격: ritenuto / stringendo / a tempo','뤼시 규칙: 상행=조임, 하행=늦춤'],
+q:[mc('소리를 키우지 않고 음을 살짝 길게 늘여 주는 강세는?',['다이내믹 악센트','아고긱 악센트','스포르찬도','테누토'],1,'셋잇단 첫 음·정점 음을 미세하게 끄는 것.'),
+sa('반주는 일정한데 선율만 자유롭게 밀고 당기는 루바토는?','선율 루바토','쇼팽식. "훔친 시간은 같은 마디 안에서 되갚는다".'),
+mc('즉시 당겨 느리게 하는 지시어는?',['ritardando','ritenuto','rallentando','allargando'],1,'ritenuto=점진적이 아닌 즉각적.')],
+task:'느린 악장 한 악구에 아고긱(어느 음을 살짝 끌지)을 3곳 표시.'},
+
+{d:27,wk:5,ph:'표현·음색',t:'관현악법 I',lead:'같은 음악도 어떻게 입히느냐로 달라져요. 7개의 축·악기군·배합.',concept:'<p>같은 음악도 <b>어떤 악기로 울리느냐</b>로 완전히 달라져요. 악기군의 성격과 배합이 관현악 색의 기초입니다.</p><table class="ctbl"><tr><th>악기군</th><th>특성</th><th>역할</th></tr><tr><td>현</td><td>균질 · 잘 융합 · 표현폭 넓음</td><td>바탕천</td></tr><tr><td>목관</td><td>개성 강함 · 각기 다른 색</td><td>색채 · 솔로</td></tr><tr><td>금관</td><td>광채 · 힘</td><td>정점 · 팡파르</td></tr><tr><td>타</td><td>리듬 · 색채</td><td>강조 · 색</td></tr></table><svg class="cdia" viewBox="0 0 320 148"><text x="160" y="14" text-anchor="middle" font-size="10" fill="#a7b4bc">오케스트라 배치 — 지휘자 앞으로 층층이</text><path d="M40,120 A120,120 0 0 1 280,120" fill="none" stroke="#6fe9cd" stroke-width="16" opacity=".35"/><path d="M62,120 A98,98 0 0 1 258,120" fill="none" stroke="#f5d18f" stroke-width="14" opacity=".35"/><path d="M84,120 A76,76 0 0 1 236,120" fill="none" stroke="#ff8575" stroke-width="13" opacity=".35"/><text x="160" y="30" text-anchor="middle" font-size="9" fill="#ff8575" font-weight="700">금관·타 (뒤)</text><text x="160" y="52" text-anchor="middle" font-size="9" fill="#f5d18f" font-weight="700">목관 (중간)</text><text x="160" y="74" text-anchor="middle" font-size="9.5" fill="#6fe9cd" font-weight="700">현 (앞·바탕천)</text><circle cx="160" cy="132" r="8" fill="#a2b3de"/><text x="160" y="146" text-anchor="middle" font-size="8.5" fill="#a7b4bc">지휘자</text></svg><p><b>해석 · </b>배합은 <b>동질</b>(같은 군 = 잘 융합), <b>이질</b>(다른 군 = 대비), <b>혼합색</b>(섞어 제3의 색)으로 나뉘어요. 림스키코르사코프의 원리는 <b>색의 절제</b> — 다 쓰지 말아야 정점에서 색이 삽니다.</p><div class="cnote"><b>지휘 함의 · </b>어느 악기군이 <b>주선율을 지금 쥐고 있는지</b>를 늘 파악하세요. 그 층을 띄우고 나머지를 받쳐 발란스를 조각합니다.</div>',read:[
+'7축: 편성·배합방식·주법·음역·수(solo/divisi/tutti)·짜임새 역할·셈여림','악기군: 현(바탕천)·목관(개성)·금관(광채)·타(리듬·색채)','배합: 동질(잘 융합)·이질(대비/혼합색)·중복(동음·옥타브)','R-K: 색의 절제 — 다 쓰지 말 것'],
+q:[mc('음색이 균질하고 잘 섞여 "바탕천"이 되는 악기군은?',['목관','금관','현악','타악'],2,'표현폭이 가장 넓음.'),
+sa('다른 군을 섞어 제3의 색을 만드는 배합을 뭐라 하나?','혼합색(이질 배합)','플루트+바이올린 유니즌의 부드러운 광택.'),
+mc('림스키코르사코프가 강조한 관현악 원리는?',['다 쓰기','색의 절제','한 악기만','타악 위주'],1,'꼭 필요한 만큼만 칠해야 정점에서 색이 삼.')],
+task:'같은 선율을 현/목관/금관으로 상상해 각각 어떤 느낌인지 메모.'},
+
+{d:28,wk:5,ph:'표현·음색',t:'관현악법 II',lead:'짜임새의 층과 주법 — 발란스 설계.',concept:'<p>짜임새의 <b>층</b>과 <b>주법</b> — 발란스 설계의 실전이에요.</p><table class="ctbl"><tr><th>구분</th><th>내용</th></tr><tr><td>5개 기능 층</td><td>주선율 · 대선율 · 베이스 · 화성 충전 · 리듬</td></tr><tr><td>sul ponticello</td><td>브리지 쪽 활 — 거칠·금속적</td></tr><tr><td>sul tasto</td><td>지판 쪽 활 — 부드럽·플루트 같은</td></tr><tr><td>con sordino</td><td>약음기 — 어둡·먼 소리</td></tr><tr><td>하모닉스</td><td>배음 — 유리 같은 맑음</td></tr></table><p><b>해석 · </b>총보에서 <b>5개 층</b>을 색으로 구분하면 발란스가 보여요 — 지금 무엇이 주선율이고 무엇이 채움인지. 작곡가의 주법 선택(sul tasto·약음기)은 곧 <b>음색·발란스 지시</b>라, 그 의도대로 큐와 균형을 만듭니다.</p><div class="cnote"><b>지휘 함의 · </b>관현악법 분석 = <b>지휘 해석의 절반</b>. 주법과 배합을 읽는 순간 어느 층을 어떻게 들려줄지가 정해져요.</div>',read:[
+'5개 층: 주선율·대선율·베이스·화성충전·리듬 — 각 층 다른 음색','성부 배치: 밀집/개리, 음역 배분','주법: sul ponticello(거칠)·sul tasto(부드럽)·con sordino(약음기)·하모닉스','지휘 함의: 배합·주법 읽기 = 발란스 설계. 관현악법 분석 = 지휘 해석의 절반'],
+q:[mc('안을 채우는 지속화음 층(흔히 호른·내성 현)은?',['주선율','대선율','화성 충전','리듬'],2,'Harmonic filler/pad.'),
+sa('브리지 쪽을 활로 그어 거칠고 금속적인 음색을 내는 주법은?','sul ponticello','sul tasto는 반대(부드럽고 플루트 같은).'),
+mc('작곡가가 sul tasto·약음기를 택한 의도를 읽으면?',['템포가 정해짐','음색·발란스 설계로 이어짐','조가 정해짐','종지가 정해짐'],1,'그 의도대로 큐·균형·음색을 만듦.')],
+task:'오케스트라 총보 한 페이지에서 5개 층을 색으로 구분해보기.'},
+
+{d:29,wk:5,ph:'표현·음색',t:'화성색·음색 텍스처',lead:'배치·음색이 화성의 색을 만들어요. 보이싱·음색선율·스펙트럼.',concept:'<p>같은 화음도 <b>배치</b>와 <b>음색</b>에 따라 색이 달라져요. 화성의 색을 만드는 요소들입니다.</p><table class="ctbl"><tr><th>요소</th><th>내용</th></tr><tr><td>보이싱</td><td>밀집=뭉침·두꺼움 / 개방=투명·공간감</td></tr><tr><td>간격</td><td>저음역 3도=뭉침 / 6·10도=열림 / 2·7도=마찰</td></tr><tr><td>중복</td><td>근음 중복=안정 / 3음 중복=색 진해짐</td></tr><tr><td>음색선율</td><td>같은 음을 악기 바꿔가며 = 색이 곧 선율(쇤베르크 Op.16-3)</td></tr><tr><td>스펙트럼</td><td>자연배음렬=융합·광채 / 어긋나게=거칠·긴장</td></tr></table><p><b>해석 · </b>화성색은 "무슨 화음이냐"만이 아니라 "어떻게 배치·중복·발성하느냐"의 문제예요. <b>음색선율</b>은 화성을 정지시키고 음색만 움직여 선율을 만드는 20세기의 발상 — 사운드 자체가 화성이 되는 스펙트럴 음악으로 이어집니다.</p><div class="cex"><div class="cex-t">🎧 예시 — 보이싱 — 밀집 vs 개방</div><div class="cex-btns"><button class="cex-b" onclick="ac();playChord([60,64,67],1.4)">밀집</button><button class="cex-b" onclick="ac();playChord([48,55,64],1.4)">개방</button></div><div class="cex-d">밀집은 한 옥타브에 뭉쳐 두껍게, 개방은 넓게 벌려 투명하게. 같은 화음도 색이 달라져요.</div></div><div class="cnote"><b>지휘 함의 · </b>화성색은 <b>발란스로 조각</b>해요. 같은 코드도 어느 층을 끌어올리냐로 색이 바뀌니, 원하는 색을 위해 특정 성부를 띄우거나 누르세요.</div>',read:[
+'간격의 색: 3도는 저음역서 뭉침, 6·10도는 열림, 4·5도=순수, 2·7도=마찰','중복: 근음 중복=안정, 3음 중복=장·단 성격 진해짐','음색선율: 같은 음을 악기 바꿔가며 = 색이 곧 선율','배음·스펙트럼: 자연배음렬대로=융합·광채 / 어긋나게=거칠·긴장'],
+q:[mc('저음역에서 뭉치기 쉬워 피해야 하는 음정은?',['6도','10도','3도','5도'],2,'저음역 3도는 탁함 → 넓게 벌려야.'),
+sa('배음을 그대로 화음으로 끌어오는 20세기 사조는?','스펙트럴(스펙트럼악파)','그리세·뮈라이 — "음색이 곧 화성".'),
+mc('3음을 중복하면 무엇이 강조되나?',['근음','장·단 성격(색)','베이스','리듬'],1,'화음의 색이 진해짐.')],
+task:'앱 사전에서 한 화음을 골라 밀집/개방·중복을 바꿔 색 변화를 귀로 익히기.'},
+
+{d:30,wk:5,ph:'표현·음색',t:'복습 — 표현·음색',lead:'문제로 다지기.',concept:'<p><b>5주차 정리.</b> 표현(셈여림·아고긱)과 음색(관현악법·화성색) — 음악에 <b>생명과 색</b>을 입히는 도구들이에요.</p><table class="ctbl"><tr><th>개념</th><th>핵심</th></tr><tr><td>셈여림</td><td>정점을 향한 다이내믹 아치로 설계</td></tr><tr><td>아고긱</td><td>시간(타이밍)으로 주는 강세·표현</td></tr><tr><td>관현악법</td><td>악기군·배합·층·주법 = 발란스</td></tr><tr><td>화성색</td><td>보이싱·중복·음색선율로 색을 조각</td></tr></table><div class="cnote"><b>복습법 · </b>한 곡의 정점을 찾아 <b>화성 긴장 + 다이내믹 + 음색</b>이 어떻게 겹치는지 한 줄로 적어보세요. 표현은 이 셋을 하나의 곡선으로 모으는 일이에요.</div>',read:['셈여림·아고긱·관현악법·화성색 점검','핵심: 표현은 정점을 향한 하나의 곡선으로 설계'],
+q:[mc('만하임 악파의 효과가 아닌 것은?',['크레셴도','로켓','한숨','헤미올라'],3,'헤미올라는 리듬 기법.'),
+sa('음량 없이 음을 길게 끌어 도드라지게 하는 강세는?','아고긱 악센트','시간으로 주는 강세.'),
+mc('관현악 5개 기능 층에 없는 것은?',['주선율','대선율','종지','리듬'],2,'주선율·대선율·베이스·화성충전·리듬.'),
+sa('같은 음을 악기 바꿔가며 만드는 "음색의 선율"은?','음색선율(Klangfarbenmelodie)','쇤베르크.')],
+task:'한 곡의 정점을 찾아 화성긴장+다이내믹+음색이 어떻게 겹치는지 한 줄로.'},
+
+// ── 6주: 형식·구조 ──
+{d:31,wk:6,ph:'형식·구조',t:'형식 기초',lead:'곡의 큰 틀을 읽어요. 소나타·론도·변주·정점.',concept:'<p>곡이 어떤 <b>큰 틀</b>로 짜였는지 보는 거예요. 구획·정점·반복의 지도를 그려야 큰 아치 위에서 국지 사건을 배치할 수 있어요.</p><table class="ctbl"><tr><th>형식</th><th>구조</th><th>특징</th></tr><tr><td>소나타</td><td>제시 → 발전 → 재현</td><td>고전 교향곡·소나타의 뼈대</td></tr><tr><td>론도</td><td>A-B-A-C-A</td><td>후렴이 돌아옴</td></tr><tr><td>변주곡</td><td>주제 + 변형들</td><td>같은 뼈대 반복 변형</td></tr><tr><td>3부형식</td><td>A-B-A</td><td>가운데 대비</td></tr><tr><td>푸가</td><td>주제 모방 대위</td><td>대위법으로 짬</td></tr></table><svg class="cdia" viewBox="0 0 320 108"><text x="160" y="14" text-anchor="middle" font-size="10" fill="#a7b4bc">소나타 형식 — 제시 · 발전 · 재현</text><rect x="10" y="30" width="70" height="34" fill="rgba(111,233,205,.25)" stroke="#6fe9cd"/><rect x="80" y="30" width="60" height="34" fill="rgba(162,179,222,.25)" stroke="#a2b3de"/><rect x="140" y="30" width="70" height="34" fill="rgba(245,209,143,.25)" stroke="#f5d18f"/><rect x="210" y="30" width="55" height="34" fill="rgba(111,233,205,.25)" stroke="#6fe9cd"/><rect x="265" y="30" width="45" height="34" fill="rgba(162,179,222,.25)" stroke="#a2b3de"/><text x="45" y="51" text-anchor="middle" font-size="8.5" fill="#dbe4e8">1주제</text><text x="110" y="51" text-anchor="middle" font-size="8.5" fill="#dbe4e8">2주제</text><text x="175" y="51" text-anchor="middle" font-size="8.5" fill="#dbe4e8">전개</text><text x="237" y="51" text-anchor="middle" font-size="8.5" fill="#dbe4e8">1주제</text><text x="287" y="51" text-anchor="middle" font-size="8.5" fill="#dbe4e8">2주제</text><text x="75" y="78" text-anchor="middle" font-size="9" fill="#6fe9cd" font-weight="700">제시부</text><text x="175" y="78" text-anchor="middle" font-size="9" fill="#f5d18f" font-weight="700">발전부</text><text x="262" y="78" text-anchor="middle" font-size="9" fill="#6fe9cd" font-weight="700">재현부(모두 으뜸조)</text><circle cx="175" cy="24" r="3.5" fill="#ff8575"/><text x="175" y="98" text-anchor="middle" font-size="8" fill="#ff8575">정점은 흔히 발전부 후반</text></svg><p><b>해석 · </b>소나타의 핵심은 <b>조성 드라마</b>예요 — 제시부에서 2주제가 다른 조(딸림조)로 떠났다가, 재현부에서 <b>모두 으뜸조로</b> 돌아와 화해합니다. 정점(Höhepunkt)은 보통 <b>발전부 후반~재현 직전</b>에 두어요.</p><div class="cnote"><b>지휘 함의 · </b>"지금 어느 칸(제시/발전/재현)인가"를 늘 파악하세요. 큰 아치 위에서 셈여림·템포를 배분해야 국지 사건이 구조에 종속됩니다.</div>',read:[
+'정점(Höhepunkt): 긴장 최고점, 흔히 2/3 지점 — 모든 완급을 여기로 설계','소나타(제시-발전-재현)·론도(후렴 회귀)·변주·푸가의 표지 읽기','하이퍼미터·악구 주기로 큰 박 흐름 느끼기','"지금 어느 칸?"을 늘 파악'],
+q:[mc('곡의 긴장 정점은 흔히 어디쯤?',['시작','1/3','2/3 부근','맨 끝'],2,'황금분할 근처. 너무 이르면 김 빠짐.'),
+sa('제시-발전-재현으로 짜인 형식의 이름은?','소나타 형식','고전 교향곡·소나타의 뼈대.'),
+mc('후렴이 반복해 돌아오는 형식은?',['변주곡','론도','푸가','소나타'],1,'A-B-A-C-A 식.')],
+task:'교향곡 1악장을 들으며 제시-발전-재현 경계를 대략 표시.'},
+
+{d:32,wk:6,ph:'형식·구조',t:'형식 기능 (캐플린)',lead:'형식을 "구획"이 아니라 "무엇을 하는 자리"로 봐요.',concept:'<p>형식을 "구획"이 아니라 <b>무엇을 하는 자리</b>로 보는 관점이에요. 같은 길이라도 기능이 다르면 다르게 연주합니다.</p><table class="ctbl"><tr><th>기능</th><th>특징</th><th>연주</th></tr><tr><td>제시구(presentation)</td><td>기본악상 제시·반복 · 안정</td><td>놓고(제시)</td></tr><tr><td>전개구(continuation)</td><td>분절·화성 가속 · 불안정</td><td>밀고(추진)</td></tr><tr><td>종지구(cadential)</td><td>종지로 닫음</td><td>매듭</td></tr></table><svg class="cdia" viewBox="0 0 320 100"><text x="160" y="14" text-anchor="middle" font-size="10" fill="#a7b4bc">형식 기능 — 8마디 문장의 세 자리</text><rect x="12" y="30" width="150" height="32" rx="6" fill="rgba(111,233,205,.2)" stroke="#6fe9cd"/><rect x="166" y="30" width="80" height="32" rx="6" fill="rgba(245,209,143,.2)" stroke="#f5d18f"/><rect x="250" y="30" width="58" height="32" rx="6" fill="rgba(255,133,117,.2)" stroke="#ff8575"/><text x="87" y="50" text-anchor="middle" font-size="9" font-weight="700" fill="#6fe9cd">제시구 (놓고)</text><text x="206" y="50" text-anchor="middle" font-size="9" font-weight="700" fill="#f5d18f">전개구 (밀고)</text><text x="279" y="50" text-anchor="middle" font-size="8.5" font-weight="700" fill="#ff8575">종지구</text><text x="87" y="80" text-anchor="middle" font-size="8.5" fill="#75818b">안정·제시·반복</text><text x="206" y="80" text-anchor="middle" font-size="8.5" fill="#75818b">분절·화성 가속</text><text x="279" y="80" text-anchor="middle" font-size="8.5" fill="#75818b">매듭</text></svg><p><b>해석 · </b>형식 기능을 알면 <b>분석이 곧 연주 지시</b>가 돼요. 제시구는 여유 있게 놓고, 전개구는 밀어붙이고, 종지구는 매듭짓듯. "이 자리는 왜 여기 있나 → 어떻게 연주하나"로 이어집니다.</p><div class="cnote"><b>지휘 함의 · </b>같은 8마디도 제시-전개-종지의 <b>기능에 따라 무게와 추진</b>을 다르게. 전개구에서 조이고 종지구에서 착지하세요.</div>',read:[
+'제시구(presentation): 기본악상 제시·반복 — 안정·시작','전개구(continuation): 분절·화성 가속 — 추진·불안정','종지구(cadential): 종지로 닫음','같은 길이라도 기능이 다르면 다르게 연주 — 제시는 놓고, 전개는 밀고, 종지는 매듭'],
+q:[mc('분절·화성 가속으로 밀어붙이는 기능 단위는?',['제시구','전개구','종지구','간주부'],1,'추진·불안정. 밀어붙일 곳.'),
+sa('캐플린 형식기능의 세 단위를 쓰시오.','제시구·전개구·종지구','시작·중간·맺음.'),
+mc('형식 기능을 알면 좋은 점은?',['조성 파악','분석이 곧 연주 지시로 번역','템포 결정','악기 선택'],1,'"이 자리는 왜 여기 있나→어떻게 연주하나".')],
+task:'8마디 문장에서 제시-전개-종지 구간을 나눠보기.'},
+
+{d:33,wk:6,ph:'형식·구조',t:'소나타 이론 (H&D)',lead:'소나타를 고정 틀이 아니라 규범과의 대화로 봐요.',concept:'<p>소나타를 고정 틀이 아니라 <b>규범과의 대화</b>로 보는 현대 이론이에요 (헤포코스키·다시).</p><table class="ctbl"><tr><th>용어</th><th>뜻</th></tr><tr><td>회전(rotation)</td><td>같은 주제 순서를 반복해 도는 구조</td></tr><tr><td>MC(매개 종지)</td><td>제1·2주제군 사이의 갈라짐 틈</td></tr><tr><td>EEC / ESC</td><td>비로소 안정된 종지에 처음 닿는 결정적 도착</td></tr><tr><td>변형(deformation)</td><td>규범을 일부러 어긴 지점 = 의미</td></tr></table><p><b>해석 · </b>이 이론의 힘은 "규범을 <b>어긴 것</b>이 곧 의미"라는 시각이에요. 작곡가가 MC를 미루거나 EEC에 못 닿게 하면, 그 <b>지연·좌절 자체가 드라마</b>입니다. 규범을 알아야 어긴 것이 들려요.</p><div class="cnote"><b>지휘 함의 · </b>MC(주제군 사이 틈)와 EEC(진짜 도착)를 찾아 <b>호흡과 무게</b>를 배치하세요. 변형 지점은 밑줄 긋듯 부각.</div>',read:[
+'회전(rotation): 같은 주제 순서를 반복해 도는 구조','MC(매개 종지): 제1·2주제군 사이의 갈라짐 틈','EEC/ESC: 비로소 안정된 종지에 처음 닿는 결정적 도착','변형(deformation): 규범을 일부러 어긴 지점 = 의미'],
+q:[mc('제1주제군과 제2주제군 사이의 "틈"은?',['EEC','MC(매개 종지)','회전','변형'],1,'호흡·무게의 분기점.'),
+sa('규범을 일부러 어겨 밑줄 긋는 지점을 뭐라 하나?','변형(deformation)','어긴 것이 곧 의미.'),
+mc('EEC/ESC가 뜻하는 것은?',['주제 제시','악장의 진짜 도착점','템포 변화','조표'],1,'구조의 진짜 도착.')],
+task:'소나타 악장에서 MC(주제군 사이 틈)를 하나 찾아 표시.'},
+
+{d:34,wk:6,ph:'형식·구조',t:'쉥커 분석 I',lead:'표면 음표 아래 숨은 몇 개의 뼈대를 봐요. "숲을 보는" 분석.',concept:'<p>표면의 수많은 음 아래 숨은 <b>몇 개의 뼈대</b>를 보는 분석이에요. "숲을 보는" 눈입니다.</p><table class="ctbl"><tr><th>개념</th><th>뜻</th></tr><tr><td>Ursatz(기본구조)</td><td>Urlinie + Bassbrechung</td></tr><tr><td>Urlinie(기본선율)</td><td>위 성부 3&#x0302;-2&#x0302;-1&#x0302; 하행</td></tr><tr><td>Bassbrechung</td><td>베이스 아르페지오 I-V-I</td></tr><tr><td>연장(prolongation)</td><td>한 화음·음을 여러 마디에 걸쳐 늘임</td></tr><tr><td>층(level)</td><td>전경(표면) → 중경 → 배경(Ursatz)</td></tr></table><svg class="cdia" viewBox="0 0 300 156"><text x="150" y="14" text-anchor="middle" font-size="10" fill="#a7b4bc">Ursatz(기본구조) — 표면 아래의 골격</text><line x1="60" y1="34" x2="60" y2="126" stroke="rgba(255,255,255,.12)" stroke-dasharray="3 3"/><line x1="150" y1="46" x2="150" y2="126" stroke="rgba(255,255,255,.12)" stroke-dasharray="3 3"/><line x1="240" y1="58" x2="240" y2="126" stroke="rgba(255,255,255,.12)" stroke-dasharray="3 3"/><path d="M54,28 Q150,10 244,52" fill="none" stroke="#6fe9cd" stroke-width="1.4"/><ellipse cx="60" cy="40" rx="7" ry="5" fill="none" stroke="#6fe9cd" stroke-width="2" transform="rotate(-20 60 40)"/><ellipse cx="150" cy="52" rx="7" ry="5" fill="none" stroke="#6fe9cd" stroke-width="2" transform="rotate(-20 150 52)"/><ellipse cx="240" cy="64" rx="7" ry="5" fill="none" stroke="#6fe9cd" stroke-width="2" transform="rotate(-20 240 64)"/><text x="60" y="24" text-anchor="middle" font-size="14" fill="#6fe9cd">3&#x0302;</text><text x="150" y="36" text-anchor="middle" font-size="14" fill="#6fe9cd">2&#x0302;</text><text x="240" y="48" text-anchor="middle" font-size="14" fill="#6fe9cd">1&#x0302;</text><ellipse cx="60" cy="106" rx="7" ry="5" fill="none" stroke="#ff8575" stroke-width="2" transform="rotate(-20 60 106)"/><ellipse cx="150" cy="106" rx="7" ry="5" fill="none" stroke="#ff8575" stroke-width="2" transform="rotate(-20 150 106)"/><ellipse cx="240" cy="106" rx="7" ry="5" fill="none" stroke="#ff8575" stroke-width="2" transform="rotate(-20 240 106)"/><path d="M54,118 Q150,138 244,118" fill="none" stroke="#ff8575" stroke-width="1.4"/><text x="60" y="150" text-anchor="middle" font-size="12" font-weight="700" fill="#dbe4e8">I</text><text x="150" y="150" text-anchor="middle" font-size="12" font-weight="700" fill="#dbe4e8">V</text><text x="240" y="150" text-anchor="middle" font-size="12" font-weight="700" fill="#dbe4e8">I</text><text x="296" y="42" text-anchor="end" font-size="8.5" fill="#75818b">기본선율</text><text x="296" y="112" text-anchor="end" font-size="8.5" fill="#75818b">베이스</text></svg><p><b>해석 · </b>쉥커의 통찰은 조성곡이 결국 <b>3&#x0302;-2&#x0302;-1&#x0302; 하행 + I-V-I</b>라는 하나의 큰 문장으로 환원된다는 것. 표면의 화려함은 이 골격을 <b>연장</b>한 장식이에요. 큰 음이 꼭 구조적인 건 아닙니다.</p><div class="cex"><div class="cex-t">🎧 예시 — Ursatz — 3̂-2̂-1̂ / I-V-I</div><div class="cex-btns"><button class="cex-b" onclick="ac();playSeq([[48,64],[43,62],[48,60]],1.1)">골격 재생</button></div><div class="cex-d">위 성부 미-레-도(3̂-2̂-1̂ 하행) + 베이스 도-솔-도(I-V-I). 곡 전체가 이 하나의 큰 문장으로 환원돼요.</div></div><div class="cnote"><b>지휘 함의 · </b>구조음과 장식음을 구별하면 <b>프레이징 스케일이 커져요</b>. 국지마다 무게 주면 부서지니, 큰 아치(Ursatz)에 국지를 종속시키세요.</div>',read:[
+'기본구조 Ursatz = 기본선율 Urlinie(3-2-1 하행) + 베이스 아르페지오 Bassbrechung(I-V-I)','연장: 한 화음·음을 여러 마디에 걸쳐 늘임','층: 전경(표면)→중경(악구)→배경(곡 전체 Ursatz)','구조음 vs 장식음 — 큰 음이 꼭 구조적인 건 아님'],
+q:[mc('쉥커의 기본선율(Urlinie)의 전형은?',['1-2-3 상행','3-2-1 하행','5-1 도약','반음계'],1,'위 성부가 으뜸음까지 단계적 하행.'),
+sa('쉥커에서 베이스의 가장 큰 단위 I-V-I를 뭐라 하나?','베이스 아르페지오 (Bassbrechung)','출발·긴장·귀환.'),
+mc('쉥커 분석이 지휘에 주는 것은?',['템포','큰 아치 위에서 국지 사건을 종속','조성','악기'],1,'국지마다 무게 주면 부서짐.')],
+task:'앱 이론탭의 쉥커 그래프(3̂-2̂-1̂ / I-V-I)를 보고 구조를 손으로 그려보기.'},
+
+{d:35,wk:6,ph:'형식·구조',t:'쉥커 분석 II — 환원',lead:'악구를 직접 환원해봐요.',concept:'<p>악구를 직접 <b>환원</b>해보는 실습이에요. 표면을 걷어내고 골격을 드러냅니다.</p><table class="ctbl"><tr><th>단계</th><th>할 일</th></tr><tr><td>1단계</td><td>경과·보조·계류음을 걷어낸다 → 남는 화음 톤이 골격</td></tr><tr><td>2단계</td><td>베이스가 I를 떠나 V에 닿고 다시 I로 오는지 찾기</td></tr><tr><td>3단계</td><td>위 성부가 어느 음에서 1&#x0302;로 내려앉는지 보기</td></tr><tr><td>4단계</td><td>골격의 아치만 먼저 지휘해본다</td></tr></table><p><b>해석 · </b>환원의 목적은 <b>구조적 청취</b>예요 — 8마디를 4개 골격 화음으로 줄여 보면, 어디가 진짜 도착이고 어디가 지나가는 장식인지 들립니다. 이것이 큰 프레이징의 근거가 돼요.</p><div class="cnote"><b>지휘 함의 · </b>먼저 <b>골격 아치</b>만 지휘해 큰 흐름을 몸에 익힌 뒤, 표면 장식을 얹으세요. 그러면 국지에 휘둘리지 않아요.</div>',read:[
+'1단계: 경과음·보조음·계류음을 걷어낸다 → 남는 화음 톤이 골격','2단계: 베이스가 I를 떠나 V에 닿고 다시 I로 오는지 찾기','3단계: 위 성부가 어느 음에서 1̂로 내려앉는지 보기','4단계: 골격의 아치만 먼저 지휘해보기'],
+q:[mc('환원의 첫 단계는?',['조표 확인','비화성음 걷어내기','악기 확인','템포 정하기'],1,'남는 화음 톤이 골격.'),
+sa('환원 후 베이스에서 찾아야 할 핵심 진행은?','I-V-I','떠남·긴장·귀환.'),
+mc('구조적 청취의 목적은?',['모든 음에 무게','작은 것을 큰 아치에 종속','빠른 템포','큰 음량'],1,'프레이징 스케일이 커짐.')],
+task:'8마디 악구에서 비화성음을 지우고 골격 화음 4개로 환원해보기.'},
+
+{d:36,wk:6,ph:'형식·구조',t:'복습 — 형식·구조',lead:'문제로 다지기.',concept:'<p><b>6주차 정리.</b> 형식(무엇을 하는 자리)과 구조(표면 아래 골격) — 곡을 <b>큰 지도</b>로 읽는 도구들이에요.</p><table class="ctbl"><tr><th>개념</th><th>핵심</th></tr><tr><td>형식 기초</td><td>소나타·론도·변주 — 큰 틀과 정점</td></tr><tr><td>형식 기능(캐플린)</td><td>제시·전개·종지 = 연주 지시</td></tr><tr><td>소나타 이론(H&D)</td><td>규범과의 대화 · 변형이 의미</td></tr><tr><td>쉥커</td><td>Ursatz(3&#x0302;-2&#x0302;-1&#x0302; + I-V-I)로 환원</td></tr></table><div class="cnote"><b>복습법 · </b>한 악장을 골라 형식을 <b>기능(제시/전개/종지)</b>으로 한 줄 요약하고, 8마디를 골격 4화음으로 환원해보세요.</div>',read:['형식·기능·소나타이론·쉥커 점검','핵심: 지도(어디)가 아니라 기능(무엇을 하나)으로 읽기'],
+q:[mc('캐플린에서 종지로 닫는 기능은?',['제시구','전개구','종지구','회전'],2,'cadential.'),
+sa('쉥커 층 3가지를 표면→전체 순으로.','전경-중경-배경','Vordergrund-Mittelgrund-Hintergrund.'),
+mc('소나타 이론에서 "진짜 도착"을 뜻하는 것은?',['MC','EEC/ESC','회전','변형'],1,'제시·재현부의 결정적 종지.'),
+sa('긴장 최고점(정점)을 독일어로?','Höhepunkt','흔히 2/3 지점.')],
+task:'한 악장의 형식을 기능(제시/전개/종지)으로 한 줄 요약.'},
+// ── 7주: 의미·해석 ──
+{d:37,wk:7,ph:'의미·해석',t:'음형론 I',lead:'특정 음형이 특정 정서를 상징하던 바로크의 음악 수사학.',concept:'<p>특정 <b>음형</b>이 특정 정서·형상을 상징하던 바로크의 <b>음악 수사학</b>이에요. 상승=천상, 반음하행=비탄처럼, 음형을 읽으면 무게·색이 한 번에 정해져요.</p><table class="ctbl"><tr><th>음형</th><th>형상</th><th>상징</th></tr><tr><td>anabasis</td><td>위로 상승</td><td>부활 · 천상</td></tr><tr><td>catabasis</td><td>아래로 하강</td><td>매장 · 겸손</td></tr><tr><td>passus duriusculus</td><td>반음계 하행 베이스</td><td>비탄 · 죽음</td></tr><tr><td>saltus duriusculus</td><td>불협 도약</td><td>충격</td></tr><tr><td>circulatio</td><td>원 그리며 돎</td><td>휘감김</td></tr></table><svg class="cdia" viewBox="0 0 320 118"><text x="160" y="14" text-anchor="middle" font-size="10" fill="#a7b4bc">음형 = 형상으로 정서를 그림</text><path d="M14,80 L44,66 L74,50 L100,34" fill="none" stroke="#6fe9cd" stroke-width="2.4" marker-end="url(#af)"/><defs><marker id="af" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#6fe9cd"/></marker><marker id="af2" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#a2b3de"/></marker></defs><text x="57" y="98" text-anchor="middle" font-size="9" fill="#6fe9cd">상승 = 천상·부활</text><path d="M120,34 L146,50 L172,66 L200,80" fill="none" stroke="#a2b3de" stroke-width="2.4" marker-end="url(#af2)"/><text x="160" y="98" text-anchor="middle" font-size="9" fill="#a2b3de">하강 = 겸손·매장</text><line x1="224" y1="42" x2="236" y2="42" stroke="#ff8575" stroke-width="2.4"/><line x1="239" y1="49" x2="251" y2="49" stroke="#ff8575" stroke-width="2.4"/><line x1="254" y1="56" x2="266" y2="56" stroke="#ff8575" stroke-width="2.4"/><line x1="269" y1="63" x2="281" y2="63" stroke="#ff8575" stroke-width="2.4"/><line x1="284" y1="70" x2="296" y2="70" stroke="#ff8575" stroke-width="2.4"/><text x="270" y="98" text-anchor="middle" font-size="9" fill="#ff8575">반음 하행 = 비탄</text></svg><p><b>해석 · </b>바로크에서 음형은 <b>수사적 약속</b>이었어요. <b>반음계 하행 베이스</b>(라멘토 베이스)는 디도의 탄식처럼 죽음·비탄을 그리고, 상승 음형은 천상을 향합니다. 음형을 읽으면 "왜 그렇게 연주해야 하는가"의 역사적 근거가 생겨요.</p><div class="cex"><div class="cex-t">🎧 예시 — 라멘토 베이스 (반음계 하행)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playMel([60,59,58,57],0.75)">하행 재생</button></div><div class="cex-d">반음계 하행(도-시-시♭-라) = 비탄·죽음의 상징(passus duriusculus). 디도의 탄식이 이 음형이에요.</div></div><div class="cnote"><b>지휘 함의 · </b>음형의 정서를 곧 <b>주법·무게</b>로 번역하세요. 상승 음형엔 무게를 위로 실어 열어 주고, 반음 하행엔 한숨처럼 떨구듯.</div>',read:[
+'anabasis(상승)=부활·천상 / catabasis(하강)=매장·겸손','passus duriusculus: 반음계 하행 베이스=비탄·죽음','saltus duriusculus: 불협 도약=충격','circulatio: 원 그리며 돎=휘감김'],
+q:[mc('반음계 하행 베이스가 상징하는 정서는?',['기쁨','비탄·죽음','승리','평온'],1,'passus duriusculus. 디도의 탄식.'),
+sa('음형이 위로 오르며 부활·천상을 상징하는 것은?','anabasis','연주: 무게를 위로 실어.'),
+mc('음형론이 지휘에 주는 것은?',['템포','정서를 곧 주법·무게로 번역','조성','악기'],1,'"왜 그렇게"의 역사적 근거.')],
+task:'바흐 수난곡에서 반음계 하행(비탄)을 하나 찾아보기.'},
+
+{d:38,wk:7,ph:'의미·해석',t:'음형론 II',lead:'말하기 음형과 큰 수사구조.',concept:'<p>말하기(수사) 음형과 큰 수사구조예요.</p><table class="ctbl"><tr><th>음형</th><th>형상</th><th>정서</th></tr><tr><td>suspiratio / pianto</td><td>2도 하행(흔히 반음)</td><td>한숨 · 눈물</td></tr><tr><td>aposiopesis</td><td>갑작 총휴지</td><td>말 삼킴 · 전환</td></tr><tr><td>exclamatio</td><td>6도↑ 솟구침</td><td>외침</td></tr><tr><td>interrogatio</td><td>끝을 올려</td><td>질문</td></tr></table><p><b>해석 · </b>개별 음형을 넘어, 곡 전체를 <b>연설처럼</b> 읽을 수도 있어요 — 도입(exordium) → 진술 → 논증 → 결론(peroratio). 형식을 "설득의 흐름"으로 보면 어디서 힘을 주고 어디서 풀지가 논리로 잡힙니다.</p><div class="cex"><div class="cex-t">🎧 예시 — 한숨 음형 (pianto)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playMel([69,67,65,64],0.55)">한숨 재생</button></div><div class="cex-d">2도 하행(흔히 반음)의 한숨·눈물. 기대듯 얹었다 떨구는 릴리스로 연주해요.</div></div><div class="cnote"><b>지휘 함의 · </b>한숨(pianto)은 <b>기대듯 얹었다 떨구는</b> 릴리스로, 총휴지(aposiopesis)는 그 침묵의 장력을 온몸으로 붙드세요.</div>',read:[
+'suspiratio/pianto: 2도 하행·한숨=탄식·눈물','aposiopesis: 갑작 총휴지=말 삼킴·전환','exclamatio: 6도↑ 솟구침=외침 / interrogatio: 끝 올려=질문','큰 수사구조: 도입(exordium)-진술-논증-결론(peroratio)'],
+q:[mc('갑작스런 총휴지로 "말 삼킴·충격"을 주는 음형은?',['pianto','aposiopesis','exclamatio','tirata'],1,'침묵의 장력.'),
+sa('2도 하행(흔히 반음)으로 한숨·눈물을 그리는 음형은?','pianto(suspiratio)','기대듯 떨구는 릴리스.'),
+mc('연설처럼 곡을 도입-진술-논증-결론으로 읽는 시선은?',['집합론','큰 수사구조','톤네츠','아이소리듬'],1,'형식을 설득의 흐름으로.')],
+task:'느린 악장에서 "한숨(pianto)" 제스처를 찾아 연주 함의(릴리스)를 메모.'},
+
+{d:39,wk:7,ph:'의미·해석',t:'토포스 (표상)',lead:'사냥·전원·행진·탄식 같은 관습적 장면의 단서를 읽어요.',concept:'<p>음악의 <b>표상</b> — 사냥·전원·행진·탄식 같은 관습적 장면을 가리키는 단서(리듬·음색·조)예요. 토포스가 바뀌는 순간이 드라마의 전환점입니다.</p><table class="ctbl"><tr><th>토포스</th><th>단서</th><th>환기</th></tr><tr><td>사냥</td><td>6/8 · 뿔피리 5도 · 팡파르</td><td>야외 · 귀족 · 활력</td></tr><tr><td>전원</td><td>드론 · 6/8 · 느린 화성</td><td>목가 · 평온</td></tr><tr><td>행진</td><td>2박 · 점음표</td><td>군대 · 위엄</td></tr><tr><td>탄식</td><td>반음 하행 · 느림</td><td>애도</td></tr><tr><td>교회(stile antico)</td><td>대위 · 긴 음가</td><td>엄숙 · 권위</td></tr></table><p><b>해석 · </b>토포스를 알아보면 <b>같은 8분음표도</b> 사냥이면 튀고 교회면 잇는 식으로 주법이 한 번에 정해져요. 전원에서 질풍노도(단조·트레몰로)로 <b>토포스가 전환</b>되는 순간이 곧 곡의 분기점입니다.</p><div class="cnote"><b>지휘 함의 · </b>토포스가 바뀌면 <b>음색·무게·주법을 통째로</b> 바꿔 그 장면을 전하세요. 전원의 여유 ↔ 행진의 각.</div>',read:[
+'사냥: 6/8·뿔피리 5도·팡파르 / 전원: 드론·6/8·느린 화성','행진: 2박·점음표 / 춤: 3박 정형','교회(stile antico): 대위·긴 음가=엄숙 / 질풍노도: 단조·트레몰로·도약','토포스 전환(전원→질풍노도)=드라마 분기점'],
+q:[mc('드론+6/8 흔들림+느린 화성이 환기하는 토포스는?',['행진','전원','사냥','교회'],1,'목가·평온·자연.'),
+sa('대위·푸가토·긴 음가로 엄숙·권위를 주는 토포스는?','교회 양식(stile antico)','과거를 환기.'),
+mc('토포스를 알아보면 무엇이 한 번에 정해지나?',['조성','주법·음색·무게','템포만','악기 수'],1,'같은 8분음표도 사냥이면 튀고 교회면 잇는다.')],
+task:'한 악장에서 토포스 전환(예: 전원→질풍노도)을 하나 찾기.'},
+
+{d:40,wk:7,ph:'의미·해석',t:'음악심리 — 기대',lead:'왜 그렇게 들리는가. 기대의 생성·지연·위반·충족이 정서를 만들어요.',concept:'<p>왜 그렇게 들리는가. <b>기대의 생성·지연·위반·충족</b>이 정서를 만든다는 관점이에요 — 정점을 언제 두고 해결을 얼마나 미룰지의 근거입니다.</p><table class="ctbl"><tr><th>학자/이론</th><th>핵심</th></tr><tr><td>마이어(1956)</td><td>정서 = 기대의 생성·지연·위반·충족</td></tr><tr><td>나무어 I-R</td><td>음형이 다음을 암시(함의) → 충족/비틀기</td></tr><tr><td>후런 ITPRA</td><td>상상-긴장-예측-반응-평가 (지연된 해결이 쾌감↑)</td></tr></table><svg class="cdia" viewBox="0 0 320 118"><text x="160" y="14" text-anchor="middle" font-size="10" fill="#a7b4bc">기대 곡선 — 지연될수록 짜릿한 해결</text><line x1="18" y1="96" x2="305" y2="96" stroke="#75818b" stroke-width="1"/><path d="M20,92 C70,88 100,50 140,42 L200,42 C240,42 270,70 300,90" fill="none" stroke="#6fe9cd" stroke-width="2.4"/><line x1="140" y1="42" x2="200" y2="42" stroke="#f5d18f" stroke-width="3"/><circle cx="200" cy="42" r="4" fill="#ff8575"/><text x="75" y="112" text-anchor="middle" font-size="9" fill="#6fe9cd">긴장 상승</text><text x="170" y="34" text-anchor="middle" font-size="9" fill="#f5d18f" font-weight="700">지연(버티기)</text><text x="270" y="112" text-anchor="middle" font-size="9" fill="#ff8575" font-weight="700">해결 ↓</text></svg><p><b>해석 · </b>너무 뻔하면 지루하고 너무 어긋나면 혼란스러워요. 좋은 음악은 <b>기대를 만들고, 살짝 미루고, 결국 채워</b> 짜릿함을 줍니다. 후런의 ITPRA는 <b>지연된 해결</b>이 왜 더 강한 쾌감을 주는지 설명해요.</p><div class="cex"><div class="cex-t">🎧 예시 — 기대 — 충족 vs 위반</div><div class="cex-btns"><button class="cex-b" onclick="ac();playSeq([[67,71,74],[60,64,67]],1.0)">충족 V→I</button><button class="cex-b" onclick="ac();playSeq([[67,71,74],[69,72,76]],1.0)">위반 V→vi</button></div><div class="cex-d">V 다음 I(충족)를 기대하는데 vi로 빠지면(위반) 놀람·지연이 생겨요. 이 위반이 정서를 만듭니다.</div></div><div class="cnote"><b>지휘 함의 · </b>해결을 <b>얼마나 미룰지</b>가 표현의 핵심. 도미넌트에서 조이며 기대를 쌓고, 도착을 살짝 지연했다 풀어 카타르시스를 만드세요.</div>',read:[
+'마이어(1956): 정서 = 기대의 생성·지연·위반·충족','나무어 I-R: 음형이 다음을 암시, 충족/비틈','후런 ITPRA: 상상-긴장-예측-반응-평가 — 지연된 해결이 쾌감↑','정점은 후반 2/3 부근에 와야 자연스러움'],
+q:[mc('음악의 정서가 나온다고 마이어가 본 원천은?',['음량','기대의 생성·지연·위반·충족','조성','악기'],1,'너무 뻔하면 지루, 너무 어긋나면 혼란.'),
+sa('지연된 해결이 왜 더 짜릿한지 다섯 단계로 설명한 이론(ITPRA)의 학자는?','후런(Huron)','Sweet Anticipation(2006).'),
+mc('정점(긴장 최고점)이 오기 좋은 위치는?',['맨 앞','정중앙','후반 2/3 부근','맨 끝'],2,'너무 이르면 김 빠짐.')],
+task:'좋아하는 곡에서 "해결을 미뤄 짜릿한" 지점을 하나 찾아 왜 그런지 메모.'},
+
+{d:41,wk:7,ph:'의미·해석',t:'게슈탈트·기억·시간',lead:'우리가 어떻게 악구로 묶어 듣고 기억하는가.',concept:'<p>우리가 어떻게 <b>악구로 묶어 듣고 기억하는가</b>예요.</p><table class="ctbl"><tr><th>개념</th><th>내용</th></tr><tr><td>게슈탈트 묶기</td><td>근접·유사·연속으로 악구 자동 분절 (GTTM)</td></tr><tr><td>기억 층</td><td>메아리 → 작업 → 장기 (재현부가 의미 있는 이유)</td></tr><tr><td>크로노스 vs 카이로스</td><td>시계 시간 vs 질적·주관적 순간</td></tr><tr><td>시간 지각</td><td>rit이 시간을 늘려 느끼게 함 (사건 밀도↓)</td></tr></table><p><b>해석 · </b>우리는 마디를 자동으로 악구로 <b>묶어</b> 듣고, 재현부에서 앞의 것을 <b>기억</b>해 의미를 느껴요. 페르마타·정점에서 늘어나는 <b>카이로스</b>(질적 시간)는 rit이 사건 밀도를 낮춰 "한 순간에 오래 머물게" 하기 때문입니다.</p><div class="cnote"><b>지휘 함의 · </b>rit(늦춤)은 <b>시간을 늘려</b> 그 순간에 머물게 하는 도구예요. 페르마타에서 시간이 늘어나는 체감을 몸으로 붙드세요.</div>',read:[
+'게슈탈트 묶기: 근접·유사·연속으로 악구 자동 분절(GTTM)','기억 층: 메아리·작업·장기 — 재현부가 의미 있는 이유','크로노스(시계 시간) vs 카이로스(질적 순간)','rit이 "더 많은 시간"으로 느껴지는 이유: 사건 밀도↓'],
+q:[mc('마디들을 악구로 자동으로 묶는 원리는?',['집합론','게슈탈트(근접·유사·연속)','아이소리듬','톤네츠'],1,'레르달-잭켄도프 GTTM.'),
+sa('페르마타·정점에서 늘어나는 주관적·질적 시간을 뭐라 하나?','카이로스','크로노스=시계 시간.'),
+mc('rit(늦춤)이 시간을 늘려 느끼게 하는 이유는?',['음량 증가','사건 밀도가 낮아져 주의가 길어짐','조성 변화','악기 증가'],1,'한 순간에 머무는 시간이 길어짐.')],
+task:'페르마타가 있는 악구에서 "시간이 늘어나는" 체감을 지휘 동작으로 상상.'},
+
+{d:42,wk:7,ph:'의미·해석',t:'복습 — 의미·해석',lead:'문제로 다지기.',concept:'<p><b>7주차 정리.</b> 음악의 <b>의미</b>를 읽고 그것을 연주로 번역하는 도구들이에요.</p><table class="ctbl"><tr><th>개념</th><th>핵심</th></tr><tr><td>음형론</td><td>음형 = 정서 (상승·하강·반음하행·한숨)</td></tr><tr><td>토포스</td><td>관습적 장면(사냥·전원·행진·탄식)의 단서</td></tr><tr><td>음악심리</td><td>기대의 생성·지연·충족이 정서</td></tr><tr><td>게슈탈트·시간</td><td>악구로 묶어 듣기 · 카이로스</td></tr></table><div class="cnote"><b>복습법 · </b>한 악구에서 <b>음형 1 + 토포스 1</b>을 찾아 "이래서 이렇게 연주한다"를 한 줄로 적어보세요. 표면 너머의 의미가 곧 연주 근거예요.</div>',read:['음형론·토포스·음악심리 점검','핵심: 표면 너머의 의미를 읽어 주법·무게로 번역'],
+q:[mc('exclamatio(외침) 음형의 형상은?',['반음 하행','6도↑ 솟구침','총휴지','원 그리기'],1,'솟는 음에 무게·열기.'),
+sa('사냥 토포스의 대표 단서 2가지.','6/8 · 뿔피리 5도(팡파르)','야외·귀족·활력.'),
+mc('나무어의 이론(I-R)이 다루는 것은?',['음 집합','한 음형이 다음을 어떻게 암시하는가','톤네츠','판본'],1,'함의-실현.'),
+sa('음형론이 "어떻게"라면 무엇의 "왜 그렇게"를 주나?','셈여림·아고긱(표현)의 역사적 근거','13·14장과 짝.')],
+task:'한 악구에서 음형 1 + 토포스 1을 찾아 "이래서 이렇게 연주"를 한 줄로.'},
+
+// ── 8주: 확장 + 시험 ──
+{d:43,wk:8,ph:'확장',t:'해석사·연주 전통',lead:'같은 악보를 시대마다 다르게. "정답은 하나가 아니다".',concept:'<p>같은 악보를 <b>시대마다 다르게</b> 연주해 왔어요. "정답은 하나가 아니다"라는 것, 그리고 내 선택의 근거를 역사에서 찾는 것이 핵심입니다.</p><table class="ctbl"><tr><th>경향</th><th>특징</th></tr><tr><td>주관·유기적</td><td>템포 자유·큰 호흡 (푸르트벵글러 계열)</td></tr><tr><td>즉물·정확</td><td>악보에 충실 (토스카니니 계열)</td></tr><tr><td>HIP 원전연주</td><td>시대악기·빠른 템포·비브라토 절제·작은 편성</td></tr><tr><td>판본</td><td>Urtext vs 연주판 — 판본 선택도 이미 해석</td></tr></table><p><b>해석 · </b>리디아 괴어는 "작품에 충실=객관"이라는 생각조차 <b>1800년경의 관념</b>임을 보였고, 타루스킨은 HIP의 "진정성"이 사실 <b>20세기의 취향</b>이라 지적했어요. 즉 모든 연주는 해석이며, 중요한 건 <b>왜 그렇게 하는지</b>의 근거예요.</p><div class="cnote"><b>지휘 함의 · </b>같은 곡의 <b>역사적 녹음 2~3종</b>을 같은 악구로 비교하세요. 차이를 역추적하면 내 템포·프레이징 선택의 근거가 단단해져요.</div>',read:[
+'양극: 주관·유기적(푸르트벵글러 경향) vs 즉물·정확(토스카니니 경향)','HIP 원전연주: 시대악기·빠른 템포·비브라토 절제·작은 편성','괴어: "작품" 개념은 1800년경 관념 / 타루스킨: HIP 진정성=20세기 취향','판본(Urtext vs 연주판)도 이미 해석'],
+q:[mc('원전연주(HIP)가 가져온 변화가 아닌 것은?',['빠른 템포','비브라토 절제','작은 편성','느린 템포·큰 편성'],3,'가볍고 빠르고 또렷하게.'),
+sa('"작품에 충실=객관"조차 1800년경 관념임을 보인 철학자는?','리디아 괴어','The Imaginary Museum of Musical Works.'),
+mc('해석사 공부의 실전 방법은?',['한 녹음만 반복','역사적 녹음 3종을 같은 악구로 비교','악보만 보기','템포만 재기'],1,'차이를 역추적해 내 선택의 근거로.')],
+task:'같은 곡의 서로 다른 녹음 2종을 같은 악구로 비교해 3가지 차이를 적기.'},
+
+{d:44,wk:8,ph:'확장',t:'신리만 변형이론 I',lead:'화음을 "다른 화음으로 가는 동작"으로 봐요. 기능으로 안 풀리는 진행.',concept:'<p>화음을 "무엇이다"가 아니라 <b>다른 화음으로 가는 동작</b>으로 보는 관점이에요. 기능화성으로 안 풀리는 반음계 진행을 설명합니다.</p><table class="ctbl"><tr><th>변형</th><th>이동</th><th>예</th></tr><tr><td>P (Parallel)</td><td>같은 으뜸 장↔단 · 3음만 반음</td><td>C장 ↔ c단</td></tr><tr><td>L (Leading-tone)</td><td>장 밑음 반음↓ → 위 단화음</td><td>C장 → e단</td></tr><tr><td>R (Relative)</td><td>나란한조 · 5음 온음</td><td>C장 ↔ a단</td></tr></table><svg class="cdia" viewBox="0 0 320 138"><text x="160" y="14" text-anchor="middle" font-size="10" fill="#a7b4bc">PLR — 한 음만 반음 움직여 옮겨가기(아낌)</text><circle cx="160" cy="70" r="24" fill="rgba(111,233,205,.2)" stroke="#6fe9cd" stroke-width="1.8"/><text x="160" y="75" text-anchor="middle" font-size="13" font-weight="800" fill="#6fe9cd">C장</text><circle cx="60" cy="112" r="21" fill="rgba(162,179,222,.18)" stroke="#a2b3de"/><text x="60" y="117" text-anchor="middle" font-size="11" font-weight="700" fill="#a2b3de">c단</text><circle cx="160" cy="120" r="21" fill="rgba(162,179,222,.18)" stroke="#a2b3de"/><text x="160" y="125" text-anchor="middle" font-size="11" font-weight="700" fill="#a2b3de">e단</text><circle cx="260" cy="112" r="21" fill="rgba(162,179,222,.18)" stroke="#a2b3de"/><text x="260" y="117" text-anchor="middle" font-size="11" font-weight="700" fill="#a2b3de">a단</text><line x1="145" y1="88" x2="75" y2="98" stroke="#75818b" stroke-width="1.5"/><line x1="160" y1="94" x2="160" y2="100" stroke="#75818b" stroke-width="1.5"/><line x1="175" y1="88" x2="245" y2="98" stroke="#75818b" stroke-width="1.5"/><text x="98" y="92" font-size="10" font-weight="700" fill="#6fe9cd">P</text><text x="167" y="99" font-size="10" font-weight="700" fill="#6fe9cd">L</text><text x="212" y="92" font-size="10" font-weight="700" fill="#6fe9cd">R</text></svg><p><b>해석 · </b>핵심 원리는 <b>아낌(parsimony)</b> — 공통음을 최대한 붙들고 <b>한 음만 반음</b> 움직여 옮겨가요. 최소의 손놀림으로 색이 확 바뀌는 것이 이 이론의 매력입니다.</p><div class="cex"><div class="cex-t">🎧 예시 — PLR 변형 (from C장조)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playSeq([[60,64,67],[60,63,67]],1.0)">P (→c단)</button><button class="cex-b" onclick="ac();playSeq([[60,64,67],[64,67,71]],1.0)">L (→e단)</button><button class="cex-b" onclick="ac();playSeq([[60,64,67],[69,72,76]],1.0)">R (→a단)</button></div><div class="cex-d">P는 3음만 반음(C장↔c단), L은 밑음이 반음 내려(C장→e단), R은 나란한조(C장↔a단). 공통음은 붙들고 한 음만 움직여요.</div></div><div class="cnote"><b>지휘 함의 · </b>공통음은 <b>고정점</b>으로 붙들고, 움직이는 한 음을 변화의 주역으로 부각하세요. 색의 전환이 곧 표현이에요.</div>',read:[
+'발상: 공통음 최대·한 음만 반음 이동(아낌)','P(Parallel): 같은 으뜸 장↔단(C↔c), 3음만 반음','L(Leading-tone): 장 밑음 반음↓→위 단화음(C장→e단), 어둡고 신비','R(Relative): 나란한조(C장↔a단), 5음 온음'],
+q:[mc('C장조와 c단조를 잇는 변형은?',['P','L','R','없음'],0,'같은 으뜸음 장↔단. 3음만 반음.'),
+sa('C장조→e단조로 가는 신리만 변형의 이름은?','L (Leading-tone exchange)','장 밑음이 반음 내려감. 어둡고 신비.'),
+mc('신리만 이론의 핵심 원리 "아낌(parsimony)"이란?',['모든 음을 바꿈','공통음 최대·한 음만 반음','근음 고정','5도 이동'],1,'최소의 손놀림으로 옮겨감.')],
+task:'C장 삼화음에서 P·L·R을 각각 적용해 도착 화음을 손으로 찾기.'},
+
+{d:45,wk:8,ph:'확장',t:'신리만 II — 톤네츠',lead:'음 공간과 육각순환. 바그너·영화음악의 색.',concept:'<p>음을 격자에 배치한 <b>음 공간</b>과, P·L을 번갈아 도는 <b>육각순환</b>이에요. 바그너·영화음악의 3도 색을 설명합니다.</p><table class="ctbl"><tr><th>개념</th><th>내용</th></tr><tr><td>톤네츠</td><td>음을 3·5도 격자에 배치 — PLR은 이웃 이동</td></tr><tr><td>육각순환(PL-cycle)</td><td>P·L 번갈아 → 6삼화음 폐곡선</td></tr><tr><td>적용</td><td>바그너 트리스탄·슈베르트 3도 전조·영화음악</td></tr></table><svg class="cdia" viewBox="0 0 320 158"><text x="160" y="14" text-anchor="middle" font-size="10" fill="#a7b4bc">육각순환 — P·L 번갈아 = 6삼화음 폐곡선</text><line x1="160" y1="20" x2="205" y2="46" stroke="#6fe9cd" stroke-width="1.8" opacity=".7"/><text x="183" y="36" text-anchor="middle" font-size="9" font-weight="800" fill="#6fe9cd">P</text><line x1="205" y1="46" x2="205" y2="98" stroke="#f5d18f" stroke-width="1.8" opacity=".7"/><text x="205" y="75" text-anchor="middle" font-size="9" font-weight="800" fill="#f5d18f">L</text><line x1="205" y1="98" x2="160" y2="124" stroke="#6fe9cd" stroke-width="1.8" opacity=".7"/><text x="183" y="114" text-anchor="middle" font-size="9" font-weight="800" fill="#6fe9cd">P</text><line x1="160" y1="124" x2="115" y2="98" stroke="#f5d18f" stroke-width="1.8" opacity=".7"/><text x="137" y="114" text-anchor="middle" font-size="9" font-weight="800" fill="#f5d18f">L</text><line x1="115" y1="98" x2="115" y2="46" stroke="#6fe9cd" stroke-width="1.8" opacity=".7"/><text x="115" y="75" text-anchor="middle" font-size="9" font-weight="800" fill="#6fe9cd">P</text><line x1="115" y1="46" x2="160" y2="20" stroke="#f5d18f" stroke-width="1.8" opacity=".7"/><text x="137" y="36" text-anchor="middle" font-size="9" font-weight="800" fill="#f5d18f">L</text><circle cx="160" cy="20" r="17" fill="rgba(111,233,205,.2)" stroke="#6fe9cd" stroke-width="1.5"/><text x="160" y="23" text-anchor="middle" font-size="9.5" font-weight="700" fill="#6fe9cd">C장</text><circle cx="205" cy="46" r="17" fill="rgba(162,179,222,.2)" stroke="#a2b3de" stroke-width="1.5"/><text x="205" y="49" text-anchor="middle" font-size="9.5" font-weight="700" fill="#a2b3de">c단</text><circle cx="205" cy="98" r="17" fill="rgba(111,233,205,.2)" stroke="#6fe9cd" stroke-width="1.5"/><text x="205" y="101" text-anchor="middle" font-size="9.5" font-weight="700" fill="#6fe9cd">A♭장</text><circle cx="160" cy="124" r="17" fill="rgba(162,179,222,.2)" stroke="#a2b3de" stroke-width="1.5"/><text x="160" y="127" text-anchor="middle" font-size="9.5" font-weight="700" fill="#a2b3de">a♭단</text><circle cx="115" cy="98" r="17" fill="rgba(111,233,205,.2)" stroke="#6fe9cd" stroke-width="1.5"/><text x="115" y="101" text-anchor="middle" font-size="9.5" font-weight="700" fill="#6fe9cd">E장</text><circle cx="115" cy="46" r="17" fill="rgba(162,179,222,.2)" stroke="#a2b3de" stroke-width="1.5"/><text x="115" y="49" text-anchor="middle" font-size="9.5" font-weight="700" fill="#a2b3de">e단</text><text x="160" y="152" text-anchor="middle" font-size="8.5" fill="#75818b">바그너·영화음악의 3도 색</text></svg><p><b>해석 · </b>P와 L을 번갈아 적용하면 <b>여섯 개의 삼화음</b>이 하나의 폐곡선(육각순환)을 이뤄요. 기능화성이 침묵하는 후기 낭만·반음계 음악의 색을 이 공간이 메웁니다.</p><div class="cex"><div class="cex-t">🎧 예시 — 육각순환 (P·L 번갈아)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playSeq([[60,64,67],[60,63,67],[56,60,63],[56,59,63],[52,56,59],[52,55,59],[60,64,67]],0.7)">6삼화음 순환</button></div><div class="cex-d">C장→c단→A♭장→a♭단→E장→e단→C장. P·L을 번갈아 여섯 삼화음이 폐곡선을 이뤄요.</div></div><div class="cnote"><b>지휘 함의 · </b>중3도 전환(예: C장→E장)은 <b>색의 문이 갑자기 열리는</b> 순간. 음색·발란스를 확 바꿔 그 경이를 전하세요.</div>',read:[
+'톤네츠: 음을 3·5도 격자에 배치 — PLR은 이웃 이동','육각순환(PL-cycle): P·L 번갈아 → 6삼화음 폐곡선','바그너 트리스탄·슈베르트 3도 전조·영화음악이 PLR로 설명','공통음=고정점, 움직이는 한 음=변화의 주역'],
+q:[mc('P와 L을 번갈아 적용하면 생기는 것은?',['5도권','6삼화음 육각순환','12음렬','온음음계'],1,'콘의 "초월적" 3도 관계 구조.'),
+sa('신리만에서 붙잡아 두는 소리(고정점) 역할을 하는 것은?','공통음','움직이는 한 음이 변화의 주역.'),
+mc('신리만 이론이 특히 유효한 레퍼토리는?',['바로크','후기 낭만·반음계','고전 소나타','중세'],1,'기능화성이 침묵하는 곳을 메움.')],
+task:'앱 이론탭 신리만 예시(톤네츠 육각순환)를 보고 P·L 경로를 따라 그려보기.'},
+
+{d:46,wk:8,ph:'확장',t:'20세기 이후 분석',lead:'조성이 해체된 뒤의 도구들. 종지 대신 통일성·질감·음향.',concept:'<p>조성이 해체된 뒤의 도구들이에요. 종지 대신 <b>통일성·질감·음향</b>을 묻습니다.</p><table class="ctbl"><tr><th>도구</th><th>내용</th></tr><tr><td>집합론(포트)</td><td>음 묶음이 분석 단위 · 음정군 벡터로 색을 수치화</td></tr><tr><td>12음·음렬주의</td><td>P·R·I·RI + 12이항 = 48 행렬</td></tr><tr><td>음계</td><td>옥타토닉·온음·메시앙 이조제한선법</td></tr><tr><td>음색·질감</td><td>음향덩어리·미소다성(리게티)·스펙트럴</td></tr></table><p><b>해석 · </b>분석의 질문이 "종지가 어디냐"에서 "<b>무엇이 이 곡을 하나로 묶나</b>(통일성·질감·음향적 정점)"로 바뀌어요. 스펙트럴 음악에선 음색 자체가 화성이 되기도 합니다.</p><div class="cex"><div class="cex-t">🎧 예시 — 온음음계 (whole-tone)</div><div class="cex-btns"><button class="cex-b" onclick="ac();playMel([60,62,64,66,68,70,72],0.34)">온음음계</button></div><div class="cex-d">반음이 없어 방향감이 흐려지는 부유하는 색(드뷔시). 조성의 중력이 사라진 소리예요.</div></div><div class="cnote"><b>지휘 함의 · </b>조성 없는 곡은 <b>질감과 음향의 정점</b>으로 큰 흐름을 잡으세요. 음색덩어리의 밀도·색 변화가 곧 드라마예요.</div>',read:[
+'집합론(포트): 음 묶음이 분석 단위, 음정군 벡터로 색 수치화','12음·음렬주의: P·R·I·RI + 12이항 = 48 행렬(총렬주의)','음계: 옥타토닉·온음·메시앙 이조제한선법','음색·질감: 음향덩어리·미소다성(리게티)·스펙트럴(음색이 곧 화성)'],
+q:[mc('조성 없는 음악을 "음 묶음(집합)"으로 분석한 학자는?',['쉥커','앨런 포트','캐플린','래트너'],1,'정규형·음정군 벡터.'),
+sa('12음렬의 네 변형을 쓰시오.','원형(P)·역행(R)·전위(I)·역행전위(RI)','+12 이항 = 48 형태.'),
+mc('20세기 레퍼토리에서 묻는 것으로 바뀐 것은?',['종지가 어디냐','통일성·질감·음향적 정점','조가 무엇이냐','박자표'],1,'분석 단위가 음집합·질감·음색으로.')],
+task:'리게티/스펙트럴 곡을 짧게 듣고 "종지 대신 무엇이 통일감을 주나" 메모.'},
+
+{d:47,wk:8,ph:'확장',t:'예술 횡단 + 구조 종합',lead:'여러 예술이 공유하는 구조 원리로 발견을 하나로 묶어요.',concept:'<p>여러 예술이 공유하는 <b>구조 원리</b>로 지금까지의 발견을 하나로 묶어요.</p><table class="ctbl"><tr><th>메타 원리</th><th>음악에서</th></tr><tr><td>중심·위계</td><td>토닉·주선율</td></tr><tr><td>긴장-해소</td><td>불협→협화, 도미넌트→토닉</td></tr><tr><td>반복·변화</td><td>동기 전개·변주</td></tr><tr><td>대칭·가역</td><td>역행·전위·회문</td></tr><tr><td>전경·배경</td><td>주선율·반주 / 쉥커 층</td></tr></table><p><b>해석 · </b>화성의 협화↔불협은 리듬의 격자↔이탈(메트릭 디소넌스)과 같은 원리예요. 분석의 마지막은 <b>모든 발견을 하나의 긴장 곡선</b>으로 통합하는 것 — 국지마다 무게 주면 부서집니다.</p><div class="cnote"><b>지휘 함의 · </b>한 악장의 <b>긴장 곡선</b>을 화성+다이내믹+아고긱+텍스처로 겹쳐 하나의 큰 아치로 그리세요. 그것이 해석의 완성이에요.</div>',read:[
+'예술 횡단: 콜라주·몽타주·내러티브 아크·라이트모티프·회문·여백(間)','메타 원리: 중심·위계 / 긴장-해소 / 운동·방향 / 반복·변화 / 대칭·가역 / 전경·배경','구조적 운율: 화성 협화↔불협 ≈ 리듬 격자↔이탈(메트릭 디소넌스)','종합 = 1부 "긴장 곡선 통합"'],
+q:[mc('분석의 마지막 단계에서 해야 할 일은?',['더 많은 디테일','발견을 원리로 묶어 큰 아치에 종속','템포 재기','악기 세기'],1,'국지마다 무게 주면 부서짐.'),
+sa('화성의 불협을 빌려 박의 어긋남을 부르는 말은?','메트릭 디소넌스','구조적 운율의 증거.'),
+mc('내러티브 아크(발단-절정-해소)와 짝이 되는 음악 개념은?',['조표','긴장 곡선','박자표','음색'],1,'소나타를 드라마로 읽기.')],
+task:'한 악장의 "긴장 곡선"을 화성+다이내믹+아고긱+텍스처로 겹쳐 한 곡선으로.'},
+
+{d:48,wk:8,ph:'모의고사',t:'2개월 모의고사',lead:'표현·형식·의미·확장 종합. 60% 이상 통과.',concept:'<p><b>2개월 종합 점검.</b> 5~8주에 배운 <b>표현·형식·의미·확장</b> 전 범위에서 출제됩니다. 아래 체크리스트로 준비도를 확인하고, 60% 미만이면 약한 주제로 돌아가세요.</p><table class="ctbl"><tr><th>주차</th><th>꼭 알아야 할 것</th></tr><tr><td>5주 표현</td><td>다이내믹 아치 · 아고긱 · 관현악법(악기군·층) · 화성색</td></tr><tr><td>6주 형식</td><td>소나타·론도 · 캐플린 기능 · 소나타이론 · 쉥커 Ursatz</td></tr><tr><td>7주 의미</td><td>음형론 · 토포스 · 기대이론 · 게슈탈트·시간</td></tr><tr><td>8주 확장</td><td>해석사 · 신리만 PLR·톤네츠 · 20세기 · 예술 횡단</td></tr></table><div class="cnote"><b>시험 팁 · </b>틀린 문제는 <b>오답 노트</b>에 자동으로 모여요. 완료 후 홈의 📝 오답 노트에서 약점을 몰아 복습하세요.</div>',read:['5~8주 전체 출제','틀린 건 해당 날로 복습'],
+q:[mc('캐플린에서 밀어붙이는 기능은?',['제시구','전개구','종지구','회전'],1,'분절·가속.'),
+sa('반음계 하행 베이스가 상징하는 정서와 음형 이름은?','비탄·죽음 / passus duriusculus','라멘토 베이스.'),
+mc('신리만 R 변형은 무엇을 잇나?',['C장↔c단','C장↔a단','C장↔e단','C장↔E장'],1,'나란한조. 5음 온음 이동.'),
+sa('HIP(원전연주)의 대표 특징 2가지.','빠른 템포 · 비브라토 절제(시대악기·작은 편성)','수사적 프레이징.'),
+mc('쉥커의 Ursatz를 이루는 두 요소는?',['주제+응답','Urlinie+Bassbrechung','MC+EEC','P+L'],1,'기본선율 + 베이스 아르페지오.')],
+task:'모의고사 오답 정리 + 약한 주제 2개를 복습 목록에.'},
+// ── 9주: 지휘 언어 ──
+{d:49,wk:9,ph:'지휘 언어',t:'지휘=언어 + 문법 전통',lead:'지휘는 약속된 코드예요. 유창해야 연주자가 알아들어요.',concept:'<p>지휘는 연주자와 <b>공유된 코드(약속)</b>예요. 이 언어가 유창해야 연주자가 망설임 없이 알아들어요.</p><table class="ctbl"><tr><th>요소</th><th>뜻</th></tr><tr><td>예비박</td><td>첫 소리 한 박 전 예고 (들숨+템포·세기)</td></tr><tr><td>익투스(ictus)</td><td>박이 떨어지는 점 = 최저점</td></tr><tr><td>반동(rebound)</td><td>익투스 후 튀어 올라 다음 박 성격 예고</td></tr><tr><td>커트오프</td><td>소리를 끊는 작은 고리</td></tr><tr><td>데드 제스처</td><td>소리 없이 쉬는 동작</td></tr></table><svg class="cdia" viewBox="0 0 320 116"><text x="160" y="14" text-anchor="middle" font-size="10" fill="#a7b4bc">한 박의 흐름 — 예비 · 익투스 · 반동</text><line x1="16" y1="92" x2="305" y2="92" stroke="#75818b" stroke-width="1"/><path d="M30,40 C60,55 80,86 105,88 C130,86 150,52 185,42" fill="none" stroke="#6fe9cd" stroke-width="2.4"/><circle cx="105" cy="88" r="4.5" fill="#ff8575"/><circle cx="30" cy="40" r="4" fill="#a2b3de"/><circle cx="185" cy="42" r="4" fill="#f5d18f"/><text x="30" y="30" text-anchor="middle" font-size="9" fill="#a2b3de">예비박</text><text x="105" y="108" text-anchor="middle" font-size="9.5" fill="#ff8575" font-weight="700">익투스(최저점)</text><text x="200" y="34" font-size="9" fill="#f5d18f">반동 → 다음 박</text></svg><p><b>해석 · </b>막스 루돌프는 박자 도형·예비박·커트오프를 <b>문법</b>처럼 체계화했고, 엘리자베스 그린은 "<b>박의 명료함이 아니라 의도의 명료함</b>"을 모토로 삼았어요. 어휘가 몸에 배어야 음악에 집중할 수 있습니다.</p><div class="cnote"><b>지휘 함의 · </b>익투스(최저점)를 또렷이 찍고, 반동 크기로 다음 박을 예고하세요. 이 기초는 <b>참고사전 → 지휘 언어 탭</b>에서 매일 확인할 수 있어요.</div>',read:[
+'박자 도형·예비박·큐 = 연주자와 공유된 코드','막스 루돌프 『지휘의 문법』: 박자 도형·예비박·커트오프를 문법처럼','엘리자베스 그린: "박의 명료함이 아니라 의도의 명료함"','공유 어휘: 예비박·익투스(박점)·반동·데드 제스처'],
+q:[mc('그린의 지휘 모토는?',['빠른 박','의도의 명료함','큰 동작','정확한 박만'],1,'Clarity of intent, not just clarity of beat.'),
+sa('박이 떨어지는 정확한 점을 뭐라 하나?','익투스 (ictus, 박점)','연주자가 여기에 맞춤.'),
+mc('『지휘의 문법』을 쓴 사람은?',['그린','막스 루돌프','말코','라반'],1,'박자 도형을 문법처럼 체계화.')],
+task:'거울 앞에서 4박 도형을 천천히 그려보고 익투스가 또렷한지 확인.'},
+
+{d:50,wk:9,ph:'지휘 언어',t:'제스처 기호학',lead:'지휘 동작이 뜻을 전하는 세 갈래 — 상징·지표·도상.',concept:'<p>지휘 동작이 뜻을 전하는 <b>세 갈래</b>예요. 좋은 지휘는 이 셋을 겹쳐 씁니다.</p><table class="ctbl"><tr><th>기호</th><th>설명</th><th>예</th></tr><tr><td>상징(symbolic)</td><td>자의적 약속</td><td>4박 도형</td></tr><tr><td>지표(indexical)</td><td>무언가를 가리킴</td><td>큐(시선+손)</td></tr><tr><td>도상(iconic)</td><td>소리의 모양을 닮음</td><td>레가토 곡선·스타카토 점</td></tr></table><p><b>해석 · </b>4박 도형은 모양에 필연성 없는 <b>약속(상징)</b>이고, 큐는 특정 주자를 <b>가리키는(지표)</b> 동작이며, 레가토의 이어진 곡선은 소리 형태를 <b>닮은(도상)</b> 동작이에요. 셋이 겹칠수록 전달이 풍부해집니다.</p><div class="cnote"><b>지휘 함의 · </b>레가토·스타카토·크레셴도를 <b>도상적</b>으로(소리 모양대로) 그리면 말보다 빠르게 전해져요.</div>',read:[
+'상징(symbolic): 자의적 약속 — 4박 도형','지표(indexical): 가리킴 — 큐(시선+손), 다이내믹 방향','도상(iconic): 음악 모양 그리기 — 레가토 곡선·스타카토 점','좋은 지휘는 셋을 겹쳐 씀'],
+q:[mc('4박 도형은 어떤 기호에 해당?',['상징','지표','도상','없음'],0,'모양에 필연성 없는 자의적 약속.'),
+sa('특정 주자에게 시선+손을 향하는 큐는 어떤 기호?','지표(indexical)','무언가를 가리킴.'),
+mc('레가토의 이어진 곡선처럼 소리 모양을 닮은 동작은?',['상징','지표','도상','반동'],2,'iconic. 동작이 소리 형태를 닮음.')],
+task:'레가토·스타카토·크레셴도를 각각 도상적 동작으로 손으로 그려보기.'},
+
+{d:51,wk:9,ph:'지휘 언어',t:'라반 에포트',lead:'음악 의도를 몸의 문법으로 옮기는 틀. 무게·시간·공간·흐름.',concept:'<p>음악 의도를 <b>몸의 문법</b>으로 옮기는 틀이에요. 네 요소의 조합으로 동작의 성격이 정해집니다.</p><table class="ctbl"><tr><th>요소</th><th>양극</th></tr><tr><td>무게</td><td>가벼움 ↔ 강함</td></tr><tr><td>시간</td><td>지속 ↔ 급격</td></tr><tr><td>공간</td><td>간접 ↔ 직접</td></tr><tr><td>흐름</td><td>자유 ↔ 억제</td></tr></table><svg class="cdia" viewBox="0 0 320 138"><text x="160" y="15" text-anchor="middle" font-size="10" fill="#a7b4bc">라반 에포트 — 4요소의 양극</text><text x="10" y="40" font-size="9" fill="#6fe9cd" font-weight="700">무게</text><line x1="66" y1="36" x2="248" y2="36" stroke="#75818b" stroke-width="1.4"/><circle cx="66" cy="36" r="3" fill="#a2b3de"/><circle cx="248" cy="36" r="3" fill="#a2b3de"/><text x="70" y="32" font-size="8.5" fill="#a7b4bc">가벼움</text><text x="244" y="32" text-anchor="end" font-size="8.5" fill="#a7b4bc">강함</text><text x="10" y="66" font-size="9" fill="#6fe9cd" font-weight="700">시간</text><line x1="66" y1="62" x2="248" y2="62" stroke="#75818b" stroke-width="1.4"/><circle cx="66" cy="62" r="3" fill="#a2b3de"/><circle cx="248" cy="62" r="3" fill="#a2b3de"/><text x="70" y="58" font-size="8.5" fill="#a7b4bc">지속</text><text x="244" y="58" text-anchor="end" font-size="8.5" fill="#a7b4bc">급격</text><text x="10" y="92" font-size="9" fill="#6fe9cd" font-weight="700">공간</text><line x1="66" y1="88" x2="248" y2="88" stroke="#75818b" stroke-width="1.4"/><circle cx="66" cy="88" r="3" fill="#a2b3de"/><circle cx="248" cy="88" r="3" fill="#a2b3de"/><text x="70" y="84" font-size="8.5" fill="#a7b4bc">간접</text><text x="244" y="84" text-anchor="end" font-size="8.5" fill="#a7b4bc">직접</text><text x="10" y="118" font-size="9" fill="#6fe9cd" font-weight="700">흐름</text><line x1="66" y1="114" x2="248" y2="114" stroke="#75818b" stroke-width="1.4"/><circle cx="66" cy="114" r="3" fill="#a2b3de"/><circle cx="248" cy="114" r="3" fill="#a2b3de"/><text x="70" y="110" font-size="8.5" fill="#a7b4bc">자유(파시브)</text><text x="244" y="110" text-anchor="end" font-size="8.5" fill="#a7b4bc">억제(악티브)</text><text x="160" y="132" text-anchor="middle" font-size="8.5" fill="#75818b">앞 셋의 조합 = 8 기본 에포트</text></svg><p><b>해석 · </b>무게·시간·공간의 조합이 <b>8 기본 에포트</b>(펀치·글라이드·대브 등)를 만들고, <b>흐름</b>(억제↔자유)이 악티브/파시브를 가릅니다. 점이 또렷하면 악티브(억제), 흐리면 파시브(자유)예요.</p><div class="cnote"><b>지휘 함의 · </b>추상적인 "표현"을 <b>무게·시간·공간·흐름</b>의 좌표로 옮기면 막연함이 사라져요. "이건 가볍고 지속되며 점이 흐린 동작" 식으로.</div>',read:[
+'4요소: 무게(가벼움↔강함)·시간(지속↔급격)·공간(간접↔직접)·흐름(자유↔억제)','8 기본 에포트: 무게·시간·공간의 조합','흐름(억제↔자유)=악티브/파시브를 가름','점 또렷=악티브(억제), 흐림=파시브(자유)'],
+q:[mc('악티브/파시브를 가르는 라반 요소는?',['무게','시간','공간','흐름'],3,'흐름 억제(bound)=악티브, 자유(free)=파시브.'),
+sa('라반 에포트의 네 요소를 쓰시오.','무게·시간·공간·흐름','앞 셋의 조합이 8 기본 에포트.'),
+mc('강·급격의 조합인 "펀치" 에포트에 해당하는 지휘는?',['레가토','마르카토','테누토','파시브'],1,'바닥서 꽝, 점 크고 또렷.')],
+task:'"마르카토=펀치", "레가토=글라이드"를 손으로 각각 재현해보기.'},
+
+{d:52,wk:9,ph:'지휘 언어',t:'에포트 번역표',lead:'의도→느낌→동작→에포트로 옮기면 막연함이 사라져요.',concept:'<p>의도 → 느낌 → 동작 → 에포트로 옮기면 표현이 <b>구체적인 동작</b>이 돼요.</p><table class="ctbl"><tr><th>주법</th><th>느낌</th><th>에포트</th></tr><tr><td>마르카토</td><td>못 박듯, 점 또렷</td><td>펀치(강·급격·직접)</td></tr><tr><td>스타카토</td><td>콕 찍고 멈춤</td><td>대브(가벼움·급격)</td></tr><tr><td>테누토</td><td>눌러 끌기</td><td>프레스(강·지속)</td></tr><tr><td>레가토</td><td>미끄러지듯</td><td>글라이드(가벼움·지속·자유)</td></tr></table><p><b>해석 · </b>순서는 <b>비유 → 점이 또렷한가 → 무게·시간</b>이에요. "이 악구는 레가토(가볍고 지속, 점 흐림)" 하고 에포트 좌표로 적으면 손이 저절로 따라옵니다. <b>예비박</b>도 받을 박의 에포트를 한 박 먼저 담는 거예요.</p><div class="cnote"><b>지휘 함의 · </b>한 악구를 정해 "마르카토=펀치 / 레가토=글라이드"처럼 에포트로 번역해 손으로 재현해보세요.</div>',read:[
+'마르카토: 못 박듯, 점 또렷(악티브)=펀치','스타카토: 콕 찍고 멈춤=대브 / 테누토: 눌러 끌기=프레스','레가토: 미끄러지듯, 점 흐림(파시브)=글라이드','예비박: 받을 박 성격을 한 박 먼저 = 받을 박 에포트를 미리'],
+q:[mc('테누토에 해당하는 에포트는?',['펀치','대브','프레스(눌러 끌기)','글라이드'],2,'강·지속. 무거운 문 천천히 밀듯.'),
+sa('점을 콕 찍고 즉시 멈추는 스타카토의 에포트는?','대브(dab)','가벼움·급격.'),
+mc('의도를 동작으로 옮기는 3단계 순서는?',['동작→느낌→에포트','느낌→동작→에포트','에포트→느낌→동작','동작→에포트→느낌'],1,'비유→점이 또렷한가→무게·시간.')],
+task:'한 악구를 "이건 레가토(가볍고 지속, 점 흐림)"식으로 에포트 좌표로 적기.'},
+
+{d:53,wk:9,ph:'지휘 언어',t:'유창성',lead:'도형이 자동화돼야 음악에 머리를 쓸 수 있어요.',concept:'<p>박자 도형이 <b>자동화</b>돼야 음악 표현에 머리를 쓸 수 있어요.</p><table class="ctbl"><tr><th>단계</th><th>내용</th></tr><tr><td>인지</td><td>생각하며 하나씩 (피츠-포스너 1단계)</td></tr><tr><td>연합</td><td>연결되며 부드러워짐</td></tr><tr><td>자동</td><td>생각 안 해도 나옴 — 여기 올라야 함</td></tr></table><p><b>해석 · </b>도형이 <b>자동 단계</b>에 있어야 표현에 인지 자원을 쓸 수 있어요. 외국어 유창성과 같은 메커니즘 — 핵심 어휘가 몸에 배어 무의식적으로 나오는 상태를 <b>체화된 인지</b>라 합니다.</p><div class="cnote"><b>지휘 함의 · </b>4박 도형을 <b>메트로놈에 맞춰 "생각 없이"</b> 나올 때까지 반복하세요. 매일 비팅 연습이 바로 이 자동화 훈련이에요.</div>',read:[
+'운동학습 3단계: 인지→연합→자동(피츠-포스너)','도형이 자동 단계여야 표현에 인지 자원','체화된 인지: 의미가 몸의 움직임에 담김','핵심 어휘가 몸에 배어 무의식적으로 나오는 상태'],
+q:[mc('박자 도형이 올라야 하는 운동학습 단계는?',['인지','연합','자동','없음'],2,'생각 안 해도 나오는 단계.'),
+sa('동작이 인지→연합→자동으로 가는 모델의 이름은?','피츠-포스너 모델','외국어 유창성과 같은 메커니즘.'),
+mc('유창성이란?',['많은 동작을 아는 것','핵심 어휘가 몸에 배어 무의식적으로 나옴','빠른 동작','큰 동작'],1,'그래야 연주자가 망설임 없이 읽음.')],
+task:'4박 도형을 메트로놈에 맞춰 "생각 없이" 나올 때까지 반복.'},
+
+{d:54,wk:9,ph:'지휘 언어',t:'실증 + 익히는 법 + 복습',lead:'"명료할수록 잘 맞춘다"는 측정된 사실.',concept:'<p>"명료할수록 잘 맞춘다"는 <b>측정된 사실</b>이에요. 그리고 9주차를 정리합니다.</p><table class="ctbl"><tr><th>실증</th><th>내용</th></tr><tr><td>동기화 지점</td><td>연주자는 수직 최저점·최대 감속에 박을 맞춤 (r≈0.6)</td></tr><tr><td>매끄러움</td><td>저크 낮은 제스처에 더 잘 동기화 (마르카토&gt;레가토)</td></tr><tr><td>예비박</td><td>"한 음절 앞선 발화" — 늦으면 진입이 무너짐</td></tr></table><p><b>해석 · </b>익히는 법의 순서는 <b>어휘 자동화 → 의도를 에포트로 → 명료·매끄럽게 → 한 박 먼저</b>예요. 연주자는 예측으로 맞추기 때문에, 명료하고 매끄러운 예비박이 앙상블의 진입을 좌우합니다.</p><div class="cnote"><b>9주 복습 · </b>지휘=언어(문법·기호) → 라반 에포트(4요소) → 번역표 → 유창성(자동화) → 실증. 추상적 의도를 <b>몸의 문법</b>으로 옮기는 흐름이에요.</div>',read:[
+'연주자는 수직 속도 최대점·최대 감속 지점에 박을 맞춤(r≈0.6)','저크 낮은(매끄러운) 제스처에 더 잘 동기화, 마르카토가 레가토보다 쉬움','익히는 법: 어휘 자동화→의도를 에포트로→명료·매끄럽게→한 박 먼저','예비박 = "한 음절 앞선 발화"'],
+q:[mc('연주자가 박을 맞추는 지휘 동작 지점은?',['최고점','최저점·최대 감속','중간','시작'],1,'실증: r≈0.60.'),
+sa('예비박이 하는 일을 한마디로.','받을 박의 템포·세기·성격을 한 박 먼저 예고','늦으면 진입이 무너짐.'),
+mc('동기화가 더 쉬운 제스처는?',['저크 높은','매끄럽고 예측 가능','불명료한','느린'],1,'명료·매끄러울수록 잘 맞물림.')],
+task:'녹음에 맞춰 지휘하며 예비박이 늦지 않는지 영상으로 점검.'},
+
+// ── 10주: 신체별 역할 ──
+{d:55,wk:10,ph:'신체별 역할',t:'오른손 — 시간',lead:'오른손은 시계. 박·템포·구획을 명확히. 명료함이 우선.',concept:'<p>오른손은 <b>시계</b>예요. 박·템포·구획을 명확히 하는 게 1순위 — 표현·색은 왼손에 넘기고, 여기선 <b>명료함</b>에 집중해요.</p><table class="ctbl"><tr><th>기능</th><th>내용</th></tr><tr><td>박자 도형</td><td>자동화 (흔들리면 언어가 무너짐)</td></tr><tr><td>익투스</td><td>최저점·최대 감속점 = 소리 나는 순간</td></tr><tr><td>반동</td><td>튀어 올라 다음 박 성격 예고</td></tr><tr><td>예비박</td><td>첫 소리 한 박 전 예고 호흡</td></tr><tr><td>세분·데드 제스처</td><td>느린 곳 잘게 / 소리 없는 쉬는 동작</td></tr></table><svg class="cdia" viewBox="0 0 320 100"><text x="160" y="14" text-anchor="middle" font-size="10" fill="#a7b4bc">양손 분업 — 오른손은 시계, 왼손은 화가</text><rect x="12" y="28" width="142" height="52" rx="10" fill="rgba(111,233,205,.14)" stroke="#6fe9cd" stroke-width="1.6"/><text x="83" y="50" text-anchor="middle" font-size="12" font-weight="800" fill="#6fe9cd">오른손 = 시간</text><text x="83" y="68" text-anchor="middle" font-size="8.5" fill="#a7b4bc">박·템포·구획 (명료)</text><rect x="166" y="28" width="142" height="52" rx="10" fill="rgba(162,179,222,.14)" stroke="#a2b3de" stroke-width="1.6"/><text x="237" y="50" text-anchor="middle" font-size="12" font-weight="800" fill="#a2b3de">왼손 = 색</text><text x="237" y="68" text-anchor="middle" font-size="8.5" fill="#a7b4bc">표현·다이내믹·큐</text></svg><p><b>해석 · </b>오른손의 1번 임무는 <b>명료한 시간</b>이에요. 익투스가 매번 또렷하고, 반동으로 다음 박을 예고하며, 예비박이 진입을 이끌어요. 여기에 표현까지 섞으면 시간이 흐려지니, <b>표현은 왼손</b>에 맡깁니다.</p><div class="cnote"><b>지휘 함의 · </b>느린 악구는 <b>세분</b>(2분박)으로 안정시키고, 정확한 익투스로 앙상블의 시간을 지키세요. 매일 트레이너의 익투스 연습이 이 기초예요.</div>',read:[
+'박자 도형 자동화(흔들리면 언어가 무너짐)','익투스: 최저점·최대 감속점 / 반동: 다음 박 성격 예고','예비박: 첫 소리 한 박 전 예고 호흡 / 커트오프: 작은 고리','세분(느린 템포·rit)·데드 제스처(소리 없는 쉬는 동작)'],
+q:[mc('오른손의 1번 임무는?',['표현','명료한 시간(박·템포·구획)','색','큐'],1,'표현은 왼손에 넘김.'),
+sa('익투스 직후 튀어 올라 다음 박 성격을 예고하는 것은?','반동(rebound)','크기·속도가 다음 박 정보.'),
+mc('느린 템포·리타르단도에서 박을 잘게 쪼개 안정시키는 것은?',['커트오프','세분(subdivide)','데드 제스처','반동'],1,'박을 잘게 쪼갬.')],
+task:'느린 악구를 세분(2분박) 넣어 지휘해보기.'},
+
+{d:56,wk:10,ph:'신체별 역할',t:'왼손 — 색',lead:'왼손은 화가. 표현·다이내믹·큐. 핵심은 독립성.',concept:'<p>왼손은 <b>화가</b>예요. 표현·다이내믹·큐를 맡아요. 핵심 난관은 오른손을 따라 하지 않는 <b>독립성</b>입니다.</p><table class="ctbl"><tr><th>역할</th><th>내용</th></tr><tr><td>독립성</td><td>미러링하면 정보 절반 → 다른 메시지 동시에</td></tr><tr><td>다이내믹</td><td>손바닥 높이=음량 은유 (위=크게, 눌러=작게)</td></tr><tr><td>큐</td><td>진입 주자에 미리 손+시선 → 그 박에 줌</td></tr><tr><td>발란스</td><td>층을 끌어올리거나 눌러 음향 무게중심 조정</td></tr><tr><td>함정</td><td>끊임없이 움직여 의미 희석 → 할 말 없으면 중립</td></tr></table><p><b>해석 · </b>왼손의 가장 큰 함정은 "<b>항상 뭔가 해야</b>"라는 강박이에요. 할 말이 없으면 중립 위치에서 쉬는 것이 오히려 강한 메시지. 발란스로 특정 층을 끌어올리거나 눌러 음향의 무게중심을 조정합니다.</p><div class="cnote"><b>지휘 함의 · </b>오른손 4박을 유지하며 왼손으로만 크레셴도 후 정지 — 매일 비팅의 <b>왼손 분리 연습</b>이 이 독립성을 길러요.</div>',read:[
+'독립성: 미러링하면 정보 절반 → 다른 메시지 동시에','다이내믹: 손바닥 높이=음량 은유(위=크게, 눌러=작게)','큐: 진입 주자에 미리 손+시선→그 박에 줌','발란스: 층을 끌어올리거나 눌러 무게중심 조정','함정: "항상 뭔가 해야" 강박 → 할 말 없으면 쉼(중립)'],
+q:[mc('왼손의 가장 큰 난관은?',['빠르기','독립성(미러링 탈피)','음량','방향'],1,'오른손을 따라 하면 정보 절반.'),
+sa('왼손이 특정 층을 끌어올리거나 눌러 음향 무게중심을 조정하는 것은?','발란스','제1편 관현악 층과 직결.'),
+mc('왼손의 흔한 함정은?',['너무 안 움직임','끊임없이 움직여 의미 희석','너무 낮음','너무 빠름'],1,'할 말 없으면 중립 위치.')],
+task:'오른손 4박 유지하며 왼손으로 4마디 크레셴도 후 정지 연습.'},
+
+{d:57,wk:10,ph:'신체별 역할',t:'시선·얼굴 + 호흡',lead:'눈맞춤은 가장 강한 큐. 호흡은 보이지 않는 박.',concept:'<p>눈맞춤은 <b>가장 강한 큐</b>, 호흡은 <b>보이지 않는 박</b>이에요.</p><table class="ctbl"><tr><th>요소</th><th>내용</th></tr><tr><td>눈맞춤</td><td>손보다 빠른 직접 큐 (악보에 코 박으면 죽음)</td></tr><tr><td>표정</td><td>성격(affect) 전염 — 긴장·평온·격정</td></tr><tr><td>호흡</td><td>예비박과 한 몸 — 들숨이 템포·세기를 실어 나름</td></tr><tr><td>통일</td><td>앙상블 호흡을 모아 시작·정점·끝을 함께</td></tr></table><p><b>해석 · </b>눈맞춤은 손동작보다 빠르고 정확한 큐라 "지금 너"를 전해요. 그래서 <b>암보·내청</b>이 실전에서 중요합니다 — 악보에 시선을 뺏기면 이 채널이 죽어요. 관·성악과 함께 들이쉬는 호흡이 진입을 하나로 묶습니다.</p><div class="cnote"><b>지휘 함의 · </b>짧은 악구를 암보해 가상의 주자에게 <b>눈으로 큐</b> 주는 연습을 하세요. 예비박에 들숨을 실어 앙상블 호흡을 모으고요.</div>',read:[
+'눈맞춤: 손보다 빠른 직접 큐 → 악보에 코 박으면 죽음(암보·내청)','표정: 성격(affect) 전염 — 긴장·평온·격정','호흡=예비박과 한 몸: 들숨이 템포·세기 실어 나름','통일: 앙상블 호흡을 모아 시작·정점·끝을 함께'],
+q:[mc('손보다 빠르고 정확한 큐는?',['반동','눈맞춤','커트오프','세분'],1,'"지금 너"를 전함.'),
+sa('예비박과 한 몸이 되어 템포·세기를 실어 나르는 것은?','호흡(들숨)','관·성악이 함께 들이쉼.'),
+mc('암보·내청이 실전에서 중요한 이유는?',['멋있어서','시선(눈맞춤) 채널을 살리려고','빠르려고','악보가 없어서'],1,'악보에 코 박으면 큐 채널이 죽음.')],
+task:'짧은 악구를 암보해 가상의 주자에게 눈으로 큐 주는 연습.'},
+
+{d:58,wk:10,ph:'신체별 역할',t:'몸통·자세 + 팔 메커니즘',lead:'안정·규모는 몸이, 크기는 관절 위계가 정해요.',concept:'<p>안정·규모는 <b>몸</b>이, 동작 크기는 <b>관절 위계</b>가 정해요.</p><table class="ctbl"><tr><th>관절</th><th>특성</th><th>쓰임</th></tr><tr><td>손목</td><td>관성 작음 · 섬세 · 빠름</td><td>pp · 빠른 잔결</td></tr><tr><td>팔뚝</td><td>중간</td><td>보통 다이내믹</td></tr><tr><td>어깨(팔 전체)</td><td>크고 강함</td><td>f · 넓은 레가토</td></tr></table><svg class="cdia" viewBox="0 0 320 128"><text x="160" y="15" text-anchor="middle" font-size="10" fill="#a7b4bc">관절 위계 — 필요한 만큼만(경제성)</text><circle cx="60" cy="66" r="14" fill="rgba(111,233,205,.2)" stroke="#6fe9cd"/><text x="60" y="70" text-anchor="middle" font-size="8" font-weight="700" fill="#6fe9cd">손목</text><text x="60" y="98" text-anchor="middle" font-size="8.5" fill="#a7b4bc">섬세·빠름</text><text x="60" y="110" text-anchor="middle" font-size="8" fill="#75818b">pp·잔결</text><circle cx="160" cy="62" r="21" fill="rgba(162,179,222,.2)" stroke="#a2b3de"/><text x="160" y="66" text-anchor="middle" font-size="8.5" font-weight="700" fill="#a2b3de">팔뚝</text><text x="160" y="98" text-anchor="middle" font-size="8.5" fill="#a7b4bc">중간</text><circle cx="262" cy="56" r="29" fill="rgba(255,133,117,.2)" stroke="#ff8575"/><text x="262" y="60" text-anchor="middle" font-size="9" font-weight="700" fill="#ff8575">어깨</text><text x="262" y="100" text-anchor="middle" font-size="8.5" fill="#a7b4bc">크고 강함</text><text x="262" y="112" text-anchor="middle" font-size="8" fill="#75818b">f·넓은 레가토</text><path d="M78,66 L139,62" stroke="#75818b" stroke-width="1.2" stroke-dasharray="3 2"/><path d="M183,60 L233,57" stroke="#75818b" stroke-width="1.2" stroke-dasharray="3 2"/></svg><p><b>해석 · </b>발 어깨너비·무게중심 낮게가 안정의 기본이고, <b>부동(멈춤)</b>도 강한 메시지예요(고요=긴장). 다운비트는 능동적 내리침이 아니라 <b>팔의 무게로 낙하 → 반동</b>으로 회복합니다. 필요한 최소 관절만 쓰는 <b>경제성</b>이 원칙 — 큰 동작을 아껴야 정점에서 효과가 삽니다.</p><div class="cnote"><b>지휘 함의 · </b>같은 악구를 손목만 / 어깨까지로 각각 지휘해 <b>크기 차이</b>를 몸으로 느껴보세요. 무게 낙하와 반동의 감각을 익히고요.</div>',read:[
+'안정: 발 어깨너비·무게중심 낮게. 부동도 강한 메시지(고요=긴장)','규모: 큰 포르테=몸·팔 전체, 섬세한 피아노=작게','관절 위계: 손목(섬세)→팔뚝(중간)→어깨(크게·강함)','원리: 무게로 낙하→반동, 필요한 최소 관절(경제성)'],
+q:[mc('가장 섬세한 피아니시모·빠른 결에 쓰는 관절은?',['어깨','팔뚝','손목','허리'],2,'관성이 가장 작아 빠르고 또렷한 익투스.'),
+sa('다운비트를 능동적 내리침이 아니라 무엇으로 떨어뜨리나?','팔의 자연 무게(낙하)','→ 반동으로 회복.'),
+mc('경제성(Ökonomie) 원칙이 뜻하는 것은?',['항상 크게','필요한 최소 관절만','항상 작게','손목만'],1,'큰 동작을 아껴야 정점에서 효과.')],
+task:'같은 악구를 손목만 / 어깨까지로 각각 지휘해 크기 차이를 몸으로 느끼기.'},
+
+{d:59,wk:10,ph:'신체별 역할',t:'양손 협응 + 분리',lead:'두 손이 다른 메시지를 동시에. 붙이고 뗄 수 있는 통제가 목표.',concept:'<p>두 손이 <b>다른 메시지를 동시에</b> — 붙이고 뗄 수 있는 통제가 목표예요. 완전 독립이 아니라 유연한 협응입니다.</p><table class="ctbl"><tr><th>단계</th><th>연습</th></tr><tr><td>1</td><td>각 손 도형·동작 자동화</td></tr><tr><td>2</td><td>왼손을 중립에 멈춰 버티기</td></tr><tr><td>3</td><td>한 번에 한 과제씩(왼손 크레셴도 등)</td></tr><tr><td>4</td><td>다른 결·타이밍 동시(오른손 마르카토+왼손 레가토)</td></tr><tr><td>5</td><td>실제 음악에 적용</td></tr></table><p><b>해석 · </b>미러링에는 <b>두 얼굴</b>이 있어요 — 강조용 의도된 미러링은 정답이고, 없애야 할 건 <b>습관성 무의식 미러링</b>뿐이에요. 목표는 완전 독립이 아니라 필요할 때 <b>붙이고 뗄 통제</b>. 전문가도 일부러 미러링합니다.</p><div class="cnote"><b>지휘 함의 · </b><b>쉬는 훈련</b>(왼손 정지)이 다르게 움직이는 훈련만큼 중요해요. 오른손 마르카토 ↔ 왼손 레가토를 동시에 그려보세요.</div>',read:[
+'분업: 오른손=시간, 왼손=색','미러링 두 얼굴: 강조용 의도된 미러링=정답 / 습관성 무의식 미러링만 탈피','5단계: ①각 손 자동화 ②왼손 정지 ③한 과제씩 ④다른 결·타이밍 ⑤실제 음악','목표: 완전 독립 X → 필요할 때 붙이고 뗄 통제'],
+q:[mc('없애야 할 미러링은?',['강조용 의도된 미러링','습관성 무의식 미러링','모든 미러링','다운비트 미러링'],1,'강조용은 오히려 정답.'),
+sa('분리 연습 2단계에서 왼손은 무엇을 하나?','중립에 멈춰 버티기(정지)','쉬는 훈련이 다르게 움직이는 훈련만큼 중요.'),
+mc('양손 협응의 목표는?',['완전 독립','필요할 때 붙이고 뗄 수 있는 통제','항상 미러링','항상 분리'],1,'전문가도 일부러 미러링함.')],
+task:'오른손 마르카토 ↔ 왼손 레가토 긴 아치를 동시에(4단계) 연습.'},
+
+{d:60,wk:10,ph:'신체별 역할',t:'복습 — 지휘·신체',lead:'문제로 다지기.',concept:'<p><b>10주차 정리.</b> 신체 각 부분이 하는 일 — 지휘는 <b>온몸의 언어</b>예요.</p><table class="ctbl"><tr><th>부위</th><th>역할</th></tr><tr><td>오른손</td><td>시간 (박·템포·구획, 명료함)</td></tr><tr><td>왼손</td><td>색 (표현·다이내믹·큐, 독립성)</td></tr><tr><td>시선·호흡</td><td>가장 빠른 큐 / 보이지 않는 박</td></tr><tr><td>몸통·팔</td><td>안정·규모 / 관절 위계로 크기</td></tr><tr><td>양손 협응</td><td>붙이고 뗄 통제 (유연한 협응)</td></tr></table><div class="cnote"><b>복습법 · </b>한 악구에 "오른손=무엇, 왼손=무엇, 시선=무엇, 호흡=무엇"을 배분표로 적어보세요. 온몸이 하나의 메시지를 향하게.</div>',read:['오른손·왼손·시선·호흡·몸통·팔·양손 점검','핵심: 오른손=시간, 왼손=색, 한 번에 한 메시지'],
+q:[mc('반동의 크기·속도가 예고하는 것은?',['조성','다음 박의 세기·템포','종지','음색'],1,'다음 박 정보를 나름.'),
+sa('큰 다이내믹·넓은 레가토에 쓰는 관절은?','어깨(팔 전체)','가장 크고 강함.'),
+mc('예비박이 늦으면?',['더 정확','진입이 무너짐','음량 증가','상관없음'],1,'연주자는 예측으로 맞춤.'),
+sa('오른손과 왼손의 기본 분업을 쓰시오.','오른손=시간, 왼손=색','섞지 않음.')],
+task:'한 악구에 "오른손=무엇, 왼손=무엇, 시선=무엇, 호흡=무엇" 배분표 작성.'},
+
+// ── 11주: 비팅 + 종합 ──
+{d:61,wk:11,ph:'비팅',t:'세코 + 악티브 vs 파시브',lead:'세코는 비팅의 최소 단위. 점을 얼마나 보여주나가 기준 축.',concept:'<p><b>세코</b>(마른 박)는 비팅의 최소 단위예요. 모든 박자 도형은 세코의 확대·축소입니다. 기준 축은 "<b>점을 얼마나 보여주나</b>" — 악티브와 파시브예요.</p><table class="ctbl"><tr><th>박</th><th>속도 곡선</th><th>성격</th></tr><tr><td>세코</td><td>짧고 건조</td><td>명료한 최소 박</td></tr><tr><td>악티브</td><td>가속 → 최저점 급감속</td><td>익투스 또렷 (억제)</td></tr><tr><td>파시브</td><td>도착까지 등속</td><td>면으로 흐름 (자유)</td></tr></table><svg class="cdia" viewBox="0 0 320 118"><text x="160" y="14" text-anchor="middle" font-size="10" fill="#a7b4bc">악티브 vs 파시브 — 점을 얼마나 보여주나</text><line x1="16" y1="92" x2="305" y2="92" stroke="#75818b" stroke-width="1"/><path d="M22,34 C50,50 68,88 78,90 C88,88 106,50 134,34" fill="none" stroke="#6fe9cd" stroke-width="2.4"/><circle cx="78" cy="90" r="4" fill="#ff8575"/><text x="78" y="110" text-anchor="middle" font-size="9" fill="#6fe9cd" font-weight="700">악티브 (점 또렷)</text><path d="M186,36 Q244,104 300,36" fill="none" stroke="#a2b3de" stroke-width="2.4"/><text x="243" y="110" text-anchor="middle" font-size="9" fill="#a2b3de" font-weight="700">파시브 (등속·점 흐림)</text></svg><p><b>해석 · </b>악티브는 최대 속도가 드러나며 <b>익투스가 콕</b> 찍히고, 파시브는 등속 궤적으로 점을 숨겨요. 중요한 건 점을 흐리든 찍든 <b>박 위치는 정확</b>해야 한다는 것 — 파시브의 정확성은 등속의 균질함과 도착 타이밍에서 나옵니다.</p><div class="cnote"><b>지휘 함의 · </b>같은 박을 악티브(콕)와 파시브(미끄러지듯)로 번갈아 그려보세요. 매일 트레이너의 악티브↔파시브 연습이 이 감각이에요.</div>',read:[
+'세코(마른 박): 짧고 건조한 명료한 박 → 도형은 세코의 확대·축소','악티브: 박점으로 가속→최저점 급감속, 익투스 또렷(억제)','파시브: 도착까지 등속, 면으로 흐름(자유)','공통: 점을 흐리든 찍든 박 위치는 정확'],
+q:[mc('비팅의 최소 단위는?',['도형','세코','반동','예비박'],1,'모든 도형은 세코의 확대·축소.'),
+sa('도착까지 등속으로 움직여 점을 숨기는 박은?','파시브','자유(free) 흐름. 등속 궤적+도착 타이밍으로 예측.'),
+mc('악티브 박의 속도 곡선은?',['등속','가속→최저점 급감속','감속만','일정'],1,'최대 속도가 드러나며 익투스 또렷.')],
+task:'같은 박을 악티브(콕)와 파시브(미끄러지듯)로 번갈아 그려보기.'},
+
+{d:62,wk:11,ph:'비팅',t:'강세 위계 + 레가토',lead:'점의 또렷함·크기로 강-약-중강-약. 선율이 얹히면 면으로.',concept:'<p>점의 또렷함·크기로 <b>강-약-중강</b>을 만들고, 선율이 얹히면 점을 잇는 <b>면</b>이 돼요.</p><table class="ctbl"><tr><th>요소</th><th>내용</th></tr><tr><td>4박 강세</td><td>강(악티브)-약(파시브)-중강-약, 점 차등</td></tr><tr><td>악/파 ≠ 강/약</td><td>표현 수단이지 등호 아님 (여린내기 업=악티브)</td></tr><tr><td>레가토</td><td>점 중심 분절 → 점을 잇는 면</td></tr><tr><td>비유</td><td>세코=자음, 레가토=모음(이어 부르기)</td></tr></table><p><b>해석 · </b>악티브/파시브는 강/약과 <b>등호가 아니에요</b> — 여린내기(업비트)를 악티브로 치거나, 강박을 파시브로 눌러 표현하기도 해요. 레가토에서는 익투스를 흐리고 궤적을 이어 <b>호흡을 그립니다</b>.</p><div class="cnote"><b>지휘 함의 · </b>4박을 강-약-중강-약 크기 차등으로 그린 뒤, 같은 4박을 레가토(면)로 연결해보세요. 자음과 모음의 차이처럼.</div>',read:[
+'4박 강세: 강(악티브)-약(파시브)-중강-약, 점 차등','악티브/파시브 ≠ 강/약 (수단이지 등호 아님)','레가토: 점 중심 분절 → 점을 잇는 면. 세코=자음, 레가토=모음','익투스 흐리고 궤적 이어 호흡을 그림'],
+q:[mc('악티브/파시브와 강/약의 관계는?',['1:1 등호','표현 수단이지 등호 아님','무관','반대'],1,'여린내기 업=악티브, 강박을 파시브로 누르기도.'),
+sa('세코가 자음이라면 레가토는 무엇에 비유되나?','모음(이어 부르기)','점 사이를 잇는 면.'),
+mc('레가토에서 익투스는?',['더 또렷','흐리고 궤적을 이음','사라짐','2배'],1,'파시브에 가깝게, 호흡을 그림.')],
+task:'4박을 강-약-중강-약 크기 차등으로, 그다음 레가토(면)로 연결해 그리기.'},
+
+{d:63,wk:11,ph:'비팅',t:'다운/업비트 + 박의 두 얼굴',lead:'내려가 바닥 찍고, 튕겨 올라 예비. 모든 박은 다음 박의 예비.',concept:'<p>내려가 바닥을 찍고(다운), 튕겨 올라 예비하는(업) 것 — 그리고 <b>모든 박은 다음 박의 예비</b>라는 통찰이에요.</p><table class="ctbl"><tr><th>구분</th><th>내용</th></tr><tr><td>다운비트</td><td>내려가 최저점 급감속·전환 = 익투스(소리 나는 순간)</td></tr><tr><td>업비트</td><td>바닥 찍고 튕겨 오르는 반동 = 다음 박 예비</td></tr><tr><td>기본형</td><td>다운=악티브 / 업=파시브 (여린내기는 업이 악티브)</td></tr><tr><td>박의 두 얼굴</td><td>받는 얼굴(강/약박) + 주는 얼굴(다음 예비)</td></tr></table><p><b>해석 · </b>익투스(박점)는 최고 속도점이 아니라 <b>최저점의 감속·전환점</b>이에요 — 최대 속도는 바닥 직전에 지나갑니다. 지휘는 박의 <b>주는 얼굴</b>(다음 예비)을 우선해요. 익투스 순간 이미 다음을 향해 반동합니다.</p><div class="cnote"><b>지휘 함의 · </b>4박에서 각 박의 반동 크기(1작·2중·3작·4큼)를 의식하며 그려, 4박의 큰 반동이 다음 강박을 끌어오게 하세요.</div>',read:[
+'다운: 내려가 최저점 급감속·전환=익투스(소리 나는 순간)','업: 바닥 찍고 튕겨 오르는 반동=다음 박 예비(곡 시작=예비박)','기본형: 다운=악티브 / 업=파시브 (여린내기는 업이 악티브)','박의 두 얼굴: 받는 얼굴(강/약박)+주는 얼굴(다음 예비), 지휘는 주는 얼굴 우선'],
+q:[mc('익투스(박점)는 어디인가?',['최고 속도점','최저점의 감속·전환점','중간','시작점'],1,'최대 속도는 바닥 직전에 지남.'),
+sa('4/4에서 동작이 가장 커지는(악티브) 박은?','4박','약박이지만 다음 강박을 끌어와야 반동이 큼.'),
+mc('지휘가 우선하는 박의 "얼굴"은?',['받는 얼굴','주는 얼굴(다음 예비)','둘 다 무시','강박만'],1,'익투스 순간 이미 다음을 향해 반동.')],
+task:'4박에서 각 박의 반동 크기(1작·2중·3작·4큼)를 의식하며 그려보기.'},
+
+{d:64,wk:11,ph:'비팅',t:'4박 도형 + 종합',lead:'방향+강세+반동의 합성. 그리고 네 개의 손잡이로 종합.',concept:'<p>방향 + 강세 + 반동을 합성한 것이 <b>4박 도형</b>이에요. 그리고 네 개의 손잡이로 비팅을 종합합니다.</p><table class="ctbl"><tr><th>요소</th><th>내용</th></tr><tr><td>도형 방향</td><td>1↓ 2← 3→ 4↑ — 각 익투스는 방향 끝의 도착점</td></tr><tr><td>반동</td><td>약박 4박의 큰 반동(위)이 다음 강박을 끌어옴</td></tr><tr><td>네 손잡이</td><td>점(질감) × 크기 × 방향 × 강세</td></tr></table><svg class="cdia" viewBox="0 0 300 168"><defs><marker id="b4" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#a7b4bc"/></marker></defs><text x="150" y="15" text-anchor="middle" font-size="10" fill="#a7b4bc">4박 도형 — 1↓ 2← 3→ 4↑</text><path d="M150,150 L66,96" stroke="#a7b4bc" stroke-width="1.6" marker-end="url(#b4)"/><path d="M66,96 L234,96" stroke="#a7b4bc" stroke-width="1.6" marker-end="url(#b4)"/><path d="M234,96 L150,42" stroke="#ff8575" stroke-width="1.8" marker-end="url(#b4)"/><path d="M150,42 L150,142" stroke="#a7b4bc" stroke-width="1.2" stroke-dasharray="3 3" opacity=".5"/><circle cx="150" cy="150" r="15" fill="rgba(255,133,117,.2)" stroke="#ff8575"/><text x="150" y="155" text-anchor="middle" font-size="12" font-weight="800" fill="#ff8575">1</text><circle cx="60" cy="96" r="14" fill="rgba(162,179,222,.2)" stroke="#a2b3de"/><text x="60" y="101" text-anchor="middle" font-size="12" font-weight="700" fill="#a2b3de">2</text><circle cx="240" cy="96" r="14" fill="rgba(162,179,222,.2)" stroke="#a2b3de"/><text x="240" y="101" text-anchor="middle" font-size="12" font-weight="700" fill="#a2b3de">3</text><circle cx="150" cy="42" r="15" fill="rgba(111,233,205,.2)" stroke="#6fe9cd"/><text x="150" y="47" text-anchor="middle" font-size="12" font-weight="800" fill="#6fe9cd">4</text><text x="150" y="164" text-anchor="middle" font-size="8.5" fill="#75818b">4박(위)의 큰 반동이 다음 강박(1)을 끌어옴</text></svg><p><b>해석 · </b>비팅은 <b>네 축</b>의 조합이에요 — 점(악티브↔파시브)·크기·방향·강세. 기준 다이얼(질감) 하나에 따로 도는 셋(크기·방향·강세)을 얹어, 기본형에선 정렬되고 표현에선 어긋나게 운용합니다.</p><div class="cnote"><b>지휘 함의 · </b>매일 트레이너의 4박 도형 궤적·반동을 그대로 손으로 재현하며, 네 축을 곡에 맞춰 자유롭게 조합하세요.</div>',read:[
+'도형(1↓ 2← 3→ 4↑): 각 익투스는 방향 끝의 도착점','약박 4박의 큰 반동(위)이 다음 강박을 끌어옴','네 손잡이: 점(질감)×크기×방향×강세','기준 다이얼 하나(질감)+따로 도는 셋(크기·방향·강세) — 기본형에선 정렬'],
+q:[mc('표준 4박 도형에서 2박의 방향은?',['아래','안/왼','바깥/오른','위'],1,'1↓ 2← 3→ 4↑.'),
+sa('비팅 설계를 이루는 네 축(손잡이)을 쓰시오.','점(질감)·크기·방향·강세','기준=질감, 나머지 셋은 독립 축.'),
+mc('4박 도형에서 반동이 가장 큰 박은?',['1박','2박','3박','4박'],3,'위로 크게=악티브, 다음 강박을 끌어옴.')],
+task:'앱 이론탭 4박 도형 SVG를 보고 궤적·반동을 그대로 손으로 재현.'},
+
+{d:65,wk:11,ph:'비팅',t:'복습 — 비팅 종합',lead:'비팅 전체를 문제로 다지기.',concept:'<p><b>11주차 정리.</b> 비팅 전체 — "<b>점을 얼마나 × 얼마나 크게 × 어디로 × 어느 박</b>"의 조합이에요.</p><table class="ctbl"><tr><th>개념</th><th>핵심</th></tr><tr><td>세코·악/파</td><td>점을 얼마나 보여주나 (기준 축)</td></tr><tr><td>강세·레가토</td><td>점 차등 / 점을 잇는 면</td></tr><tr><td>다운/업·두 얼굴</td><td>익투스=최저점 / 주는 얼굴 우선</td></tr><tr><td>4박 도형·네 축</td><td>점·크기·방향·강세</td></tr></table><div class="cnote"><b>복습법 · </b>한 악구를 정해 점(질감)·크기·방향·강세 네 축을 각각 정해 지휘해보세요. 내일은 <b>최종 종합시험</b>이에요.</div>',read:['세코·악티브/파시브·강세·레가토·다운업·두얼굴·4박도형 점검','핵심: 점을 얼마나 보여줄까 × 얼마나 크게 × 어디로 × 어느 박'],
+q:[mc('파시브 박의 정확성은 어디서 나오나?',['감속 바닥','등속 궤적의 균질함+도착 타이밍','최고점','반동'],1,'연주자는 등속을 보고 도착을 예측.'),
+sa('도형은 무엇의 확대·축소인가?','세코','같은 문법을 크기만 바꿔 운용.'),
+mc('기본형에서 다운비트의 질감은?',['파시브','악티브','테누토','없음'],1,'다운=악티브, 업=파시브(기본형).'),
+sa('점을 얼마나 보여주나 = 비팅의 무슨 축?','기준 축(질감)','악티브↔파시브.')],
+task:'한 악구를 정해 점(질감)·크기·방향·강세 네 축을 각각 정해 지휘해보기.'},
+
+{d:66,wk:11,ph:'모의고사',t:'최종 종합시험',lead:'전 과정 종합. 66일의 마무리. 70% 이상이면 완주!',concept:'<p><b>66일의 마무리 — 전 과정 종합.</b> 화성·분석·지휘·비팅 전 범위에서 출제돼요. <b>70% 이상</b>이면 완주입니다!</p><table class="ctbl"><tr><th>영역</th><th>핵심 갈무리</th></tr><tr><td>화성</td><td>화음의 질 · T-S-D · 종지 · 전조 · 신리만 PLR</td></tr><tr><td>선율·리듬</td><td>동기 전개 · 비화성음 · 대위 · 헤미올라 · 짜임새</td></tr><tr><td>표현·형식·의미</td><td>다이내믹 아치 · 쉥커 Ursatz · 음형론 · 기대이론</td></tr><tr><td>지휘·비팅</td><td>익투스·예비박 · 오른손/왼손 · 악/파 · 4박 도형</td></tr></table><div class="cnote"><b>완주를 축하해요 · </b>가장 약했던 주제 3개를 <b>오답 노트</b>에서 골라 나만의 요약 노트 한 장을 만들어보세요. 66일의 여정이 하나의 지도가 될 거예요.</div>',read:['화성·분석·지휘·비팅 전 범위','틀린 건 해당 날로 돌아가 마무리'],
+q:[mc('T→S→D→T가 뜻하는 것은?',['빠르기','집→떠남→긴장→귀가','조표','박자'],1,'조성음악의 엔진.'),
+sa('계류음의 3단계를 순서대로.','준비→걸림→해결','강박 불협에서 순차 하행.'),
+mc('쉥커 기본선율의 전형은?',['1-2-3','3-2-1 하행','5-8','반음계'],1,'Urlinie. I-V-I 위에 얹힘.'),
+sa('그린의 지휘 모토를 쓰시오.','박의 명료함이 아니라 의도의 명료함','Clarity of intent.'),
+mc('익투스(박점)의 위치는?',['최고 속도점','최저점의 감속·전환점','중간','반동'],1,'연주자가 여기에 맞춤.'),
+sa('비팅 설계의 네 축을 쓰시오.','점(질감)·크기·방향·강세','기준=질감.')],
+task:'66일 완주 축하! 가장 약했던 주제 3개를 골라 나만의 요약 노트 한 장 만들기.'}];
+
+/* ── 일일 비팅·청음 배정 ── */
+var BEATPLAN={
+1:{m:2,bpm:60,f:'2박 — 익투스를 최저점에 또렷이',lt:'기본 자세 + 익투스',lb:['발은 어깨너비, 무게중심은 낮고 안정되게. 어깨·팔의 힘을 빼요','익투스 = 박이 떨어지는 정확한 점(팔의 최저점). 연주자는 여기에 맞춰요','2박(다운·업)으로 익투스가 매번 같은 높이에 또렷이 찍히는지 보세요']},
+2:{m:3,bpm:66,f:'3박 — 세 도착점을 균일하게',lt:'예비박',lb:['시작 전 들숨과 함께 한 박 먼저 예비 동작 — 템포·세기를 예고해요','예비박이 늦으면 첫 소리 진입이 무너져요. 받을 박 성격을 미리 담으세요','3박(1↓ 2→ 3↑)으로 세 익투스를 균일한 크기로']},
+3:{m:4,bpm:72,f:'4박 — 좌우 대칭 궤적',lt:'반동(rebound)',lb:['반동 = 익투스 후 튀어 오르는 움직임. 그 크기·속도가 다음 박을 예고해요','4박(1↓ 2← 3→ 4↑)을 크고 좌우 대칭으로','4박(위)의 반동을 크게 해 다음 강박을 끌어오세요']},
+4:{m:4,bpm:76,f:'예비박 정밀',lt:'커트오프 + 세분',lb:['커트오프 = 소리를 끊는 작은 고리 동작. 종지·페르마타 뒤에 또렷이','느린 곳·리타르단도에서는 박을 잘게 쪼개(세분) 안정시켜요','데드 제스처 = 소리 없이 쉬는 동작. 멈춤도 연습이에요']},
+5:{m:4,bpm:80,f:'악티브↔파시브 대비',lt:'오른손 = 시간',lb:['오른손은 시계 — 박·템포·구획의 명료함이 1순위예요','표현·색은 왼손에 넘기고, 오른손은 흔들림 없이 시간을 지켜요','도형이 흔들리면 언어가 무너져요. 자동으로 나올 때까지']},
+6:{m:3,bpm:88,f:'강세 위계(빠른 3박)',lt:'왼손 = 색 (독립 1단계)',lb:['왼손은 화가 — 다이내믹·큐·발란스를 맡아요','미러링 벗어나기 1단계: 왼손을 중립에 멈추고 오른손만 움직여요','손바닥 높이로 음량을 은유 — 위=크게, 눌러=작게']},
+7:{m:4,bpm:84,f:'레가토 비팅',lt:'악티브 vs 파시브',lb:['악티브 = 점 또렷, 가속→최저점 급감속(억제)','파시브 = 등속으로 흐름, 점을 숨김(자유)','같은 4박을 악티브/파시브로 번갈아 그려 대비를 몸에 익혀요']},
+8:{m:6,bpm:60,f:'6박 분할',lt:'강세 위계 + 레가토',lb:['강-약-중강-약을 반동 크기로 차등 — 악/파는 수단이지 강/약과 등호가 아니에요','레가토 = 점을 잇는 면. 세코가 자음이면 레가토는 모음','6박(느린 곡)은 큰 6패턴으로 분할을 살려']},
+9:{m:4,bpm:92,f:'예비박 정밀',lt:'시선 · 호흡 · 큐',lb:['눈맞춤이 손보다 빠른 큐 — 악보에 코 박지 말고 암보·내청으로','호흡은 예비박과 한 몸. 들숨이 템포·세기를 실어 날라요','진입 주자에게 시선+손을 미리 향했다 그 박에 주세요']},
+10:{m:4,bpm:88,f:'양손 분리',lt:'몸통 · 팔 관절 위계',lb:['안정된 자세에서 규모는 몸 전체로, 섬세함은 손끝으로','관절 위계: 손목(섬세·빠름) → 팔뚝(중간) → 어깨(크게·강함)','다운비트는 능동적 내리침이 아니라 팔의 무게로 낙하→반동']},
+11:{m:4,bpm:96,f:'네 축 종합',lt:'양손 협응 + 종합',lb:['오른손=시간 ↔ 왼손=색을 필요할 때 붙이고 뗄 통제가 목표','완전 독립이 아니라 유연한 협응 — 강조용 미러링은 오히려 정답','점(질감)·크기·방향·강세 네 축을 곡에 맞춰 자유롭게 운용']}};
+var EARPLAN={1:['triad','3화음 — 장·단·증·감'],2:['seventh','7화음 — maj7·7·m7·m7♭5·dim7'],3:['interval','음정 — 2~8도'],4:['inversion','3화음 전위 — 근음·1·2전위 (베이스 듣기)'],5:['mode','선법 — 도리안·프리지안·리디안·믹솔리디안 등'],6:['cadence','종지 — 정격·반·변격·위'],7:['progression','화성 진행 받아쓰기 — I·IV·V·vi 흐름'],8:['progression','화성 진행 심화'],9:['seventh','7화음 복습'],10:['mode','선법 복습'],11:['progression','화성 진행 종합']};
+
+/* ── 오디오 ── */
+var AC=null;function ac(){if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();return AC;}
+function rnd(n){return Math.floor(Math.random()*n);}
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=rnd(i+1),t=a[i];a[i]=a[j];a[j]=t;}return a;}
+var ICTUS={2:[[150,178],[150,48]],3:[[150,178],[228,112],[150,48]],4:[[150,182],[62,116],[236,116],[150,46]],6:[[150,182],[108,150],[82,110],[220,110],[246,150],[150,46]]};
+var BT={playing:false,meter:4,bpm:72,t0:0,curBeat:0,nextT:0,timer:null,raf:null};
+function btClick(beat,time){var a=ac();var o=a.createOscillator(),g=a.createGain();o.frequency.value=beat===0?900:640;o.connect(g);g.connect(a.destination);g.gain.setValueAtTime(0.0001,time);g.gain.exponentialRampToValueAtTime(beat===0?0.5:0.32,time+0.004);g.gain.exponentialRampToValueAtTime(0.0001,time+0.08);o.start(time);o.stop(time+0.1);}
+function btSched(){var a=ac();while(BT.nextT<a.currentTime+0.12){btClick(BT.curBeat,BT.nextT);BT.nextT+=60/BT.bpm;BT.curBeat=(BT.curBeat+1)%BT.meter;}}
+function btFrame(){var a=ac();var el=a.currentTime-BT.t0;if(el<0)el=0;var bd=60/BT.bpm;var tb=el/bd;var bi=Math.floor(tb)%BT.meter;var fr=tb-Math.floor(tb);var pts=ICTUS[BT.meter];var p0=pts[bi],p1=pts[(bi+1)%BT.meter];var e=fr<.5?2*fr*fr:1-Math.pow(-2*fr+2,2)/2;var x=p0[0]+(p1[0]-p0[0])*e,y=p0[1]+(p1[1]-p0[1])*e;var dot=document.getElementById('btDot');if(dot){dot.setAttribute('cx',x);dot.setAttribute('cy',y);}var lab=document.getElementById('btBeatN');if(lab)lab.innerHTML='<b>'+(bi+1)+'</b> / '+BT.meter;lhUpdate();BT.raf=requestAnimationFrame(btFrame);}
+function btStart(){if(BT.playing)return;ac();BT.playing=true;BT.curBeat=0;BT.nextT=ac().currentTime+0.12;BT.t0=BT.nextT;BT.timer=setInterval(btSched,25);btFrame();var b=document.getElementById('btPlay');if(b)b.textContent='■ 정지';}
+function btStop(){BT.playing=false;if(BT.timer)clearInterval(BT.timer);if(BT.raf)cancelAnimationFrame(BT.raf);var b=document.getElementById('btPlay');if(b)b.textContent='▶ 시작';}
+function btToggle(){BT.playing?btStop():btStart();}
+function btSetBpm(v){BT.bpm=+v;var e=document.getElementById('btBpmV');if(e)e.textContent=v;}
+function btSetMeter(m){btStop();BT.meter=m;renderBeatSVG();document.querySelectorAll('.btm').forEach(function(b){b.classList.toggle('on',+b.getAttribute('data-m')===m);});}
+function renderBeatSVG(){var pts=ICTUS[BT.meter];var path='M'+pts.map(function(p){return p[0]+','+p[1];}).join(' L')+' L'+pts[0][0]+','+pts[0][1];var s='<svg viewBox="0 0 300 220" class="btsvg">';s+='<path d="'+path+'" fill="none" stroke="rgba(255,255,255,.13)" stroke-width="1.6" stroke-dasharray="4 4"/>';pts.forEach(function(p,i){s+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(i===0?10:8)+'" fill="'+(i===0?'#ff6f61':'#7d93c8')+'" opacity=".45"/><text x="'+p[0]+'" y="'+(p[1]+4)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#eaf1f2">'+(i+1)+'</text>';});s+='<circle id="btDot" cx="'+pts[0][0]+'" cy="'+pts[0][1]+'" r="11" fill="#5fe0c0"/></svg>';var w=document.getElementById('btSvgWrap');if(w)w.innerHTML=s;}
+var LH={on:false,ex:'hold'};
+var LHNAME={hold:'중립 유지',cresc:'4마디 크레셴도',cue:'큐 · 매 마디 3박',whole:'온음표 · 마디당 1회'};
+function lhHTML(){return '<button class="bt-lh-toggle" id="lhToggle" onclick="lhToggle()">＋ 왼손 분리 연습</button><div class="lh-box" id="lhBox"><div class="lh-head">왼손 · <b id="lhName">중립 유지</b></div><div class="lh-main"><div class="lh-track"><div class="lh-fill" id="lhFill"></div></div><div class="lh-exs"><button class="lhx on" data-x="hold" onclick="lhSet(\'hold\',this)">정지(중립)</button><button class="lhx" data-x="cresc" onclick="lhSet(\'cresc\',this)">4마디 크레셴도</button><button class="lhx" data-x="cue" onclick="lhSet(\'cue\',this)">큐 · 매 마디 3박</button><button class="lhx" data-x="whole" onclick="lhSet(\'whole\',this)">온음표 · 마디당 1회</button></div></div><div class="lh-note">오른손은 박 패턴 유지, 왼손(바)은 위 과제를 동시에 — 따라하기(미러링) 없이!</div></div>';}
+function lhToggle(){LH.on=!LH.on;var box=document.getElementById('lhBox'),btn=document.getElementById('lhToggle');if(box)box.classList.toggle('on',LH.on);if(btn){btn.classList.toggle('on',LH.on);btn.textContent=(LH.on?'－':'＋')+' 왼손 분리 연습';}}
+function lhSet(ex,btn){LH.ex=ex;document.querySelectorAll('.lhx').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-x')===ex);});var nm=document.getElementById('lhName');if(nm)nm.textContent=LHNAME[ex];}
+function lhUpdate(){if(!LH.on)return;var a=ac();var el=a.currentTime-BT.t0;if(el<0)el=0;var bd=60/BT.bpm;var tb=el/bd;var bi=Math.floor(tb)%BT.meter;var fr=tb-Math.floor(tb);var v=0.08,flash=false;
+if(LH.ex==='hold'){v=0.08;}
+else if(LH.ex==='cresc'){v=(tb/(BT.meter*4))%1;}
+else if(LH.ex==='cue'){var on=(bi===2)&&fr<0.45;v=on?0.92:0.14;flash=on;}
+else if(LH.ex==='whole'){v=Math.sin(((tb%BT.meter)/BT.meter)*Math.PI);}
+var f=document.getElementById('lhFill');if(f){f.style.height=Math.max(4,Math.round(v*100))+'%';f.classList.toggle('flash',flash);}}
+
+
+function tone(midi,time,dur,gain){var a=ac();var o=a.createOscillator(),g=a.createGain();o.type='triangle';o.frequency.value=440*Math.pow(2,(midi-69)/12);o.connect(g);g.connect(a.destination);g.gain.setValueAtTime(0.0001,time);g.gain.exponentialRampToValueAtTime(gain,time+0.02);g.gain.exponentialRampToValueAtTime(0.0001,time+dur);o.start(time);o.stop(time+dur+0.05);}
+function playChord(m,d){var t=ac().currentTime+0.05;m.forEach(function(x){tone(x,t,d,0.15);});}
+function playMel(m,d){var t=ac().currentTime+0.05;m.forEach(function(x,i){tone(x,t+i*d,d*0.9,0.22);});}
+function playSeq(chs,d){var t=ac().currentTime+0.05;chs.forEach(function(ch,i){ch.forEach(function(x){tone(x,t+i*d,d*0.9,0.14);});});}
+function pick4(list,ansLabel){var others=list.filter(function(x){return x[0]!==ansLabel;});var ch=shuffle(others).slice(0,3).map(function(x){return x[0];});ch.push(ansLabel);return shuffle(ch);}
+var EAR={
+triad:function(){var q=[['장3화음',[0,4,7]],['단3화음',[0,3,7]],['증3화음',[0,4,8]],['감3화음',[0,3,6]]];var p=q[rnd(4)],r=60+rnd(5);return{play:function(){playChord(p[1].map(function(x){return x+r;}),1.5);},choices:q.map(function(x){return x[0];}),ans:p[0],hint:p[0]+' = 근음 위 '+p[1].join('-')+' 반음'};},
+seventh:function(){var q=[['maj7',[0,4,7,11]],['딸림7(7)',[0,4,7,10]],['m7',[0,3,7,10]],['m7♭5',[0,3,6,10]],['dim7',[0,3,6,9]]];var p=q[rnd(5)],r=57+rnd(5);return{play:function(){playChord(p[1].map(function(x){return x+r;}),1.6);},choices:q.map(function(x){return x[0];}),ans:p[0],hint:p[0]+' = '+p[1].join('-')+' 반음'};},
+interval:function(){var q=[['장2도',2],['단3도',3],['장3도',4],['완전4도',5],['트라이톤',6],['완전5도',7],['장6도',9],['완전8도',12]];var p=q[rnd(q.length)],r=60+rnd(5);return{play:function(){playMel([r,r+p[1]],0.75);},choices:pick4(q,p[0]),ans:p[0],hint:p[0]+' = '+p[1]+'반음'};},
+cadence:function(){var K=60,CH={I:[K,K+4,K+7],IV:[K+5,K+9,K+12],V:[K+7,K+11,K+14],vi:[K+9,K+12,K+16]};var q=[['정격 종지',['I','V','I']],['반종지',['I','IV','V']],['변격 종지',['I','IV','I']],['위종지',['I','V','vi']]];var p=q[rnd(4)];return{play:function(){playSeq(p[1].map(function(r){return CH[r];}),0.95);},choices:q.map(function(x){return x[0];}),ans:p[0],hint:'진행: '+p[1].join('→')};},inversion:function(){var q=[['장3화음',[0,4,7]],['단3화음',[0,3,7]]][rnd(2)];var root=60+rnd(5);var inv=rnd(3);var notes=q[1].map(function(x){return x+root;});for(var k=0;k<inv;k++){var mn=Math.min.apply(null,notes);notes[notes.indexOf(mn)]=mn+12;}notes.sort(function(a,b){return a-b;});var L=['근음 위치','1전위','2전위'];return{play:function(){playChord(notes,1.5);},choices:L,ans:L[inv],hint:q[0]+' '+L[inv]+' (베이스 = '+['근음','3음','5음'][inv]+')'};},mode:function(){var M=[['이오니안(장)',[0,2,4,5,7,9,11]],['도리안',[0,2,3,5,7,9,10]],['프리지안',[0,1,3,5,7,8,10]],['리디안',[0,2,4,6,7,9,11]],['믹솔리디안',[0,2,4,5,7,9,10]],['에올리안(단)',[0,2,3,5,7,8,10]]];var m=M[rnd(M.length)];var r=60;var notes=m[1].map(function(x){return x+r;}).concat([r+12]);return{play:function(){playMel(notes,0.42);},choices:M.map(function(x){return x[0];}),ans:m[0],hint:m[0]+' 음계 — 특성음에 주목'};},progression:function(){var K=60,CH={I:[K,K+4,K+7],ii:[K+2,K+5,K+9],iii:[K+4,K+7,K+11],IV:[K+5,K+9,K+12],V:[K+7,K+11,K+14],vi:[K+9,K+12,K+16]};var P=[['I–IV–V–I',['I','IV','V','I']],['I–vi–IV–V',['I','vi','IV','V']],['ii–V–I',['ii','V','I']],['I–V–vi–IV',['I','V','vi','IV']]];var pr=P[rnd(P.length)];return{play:function(){playSeq(pr[1].map(function(r){return CH[r];}),0.85);},choices:P.map(function(x){return x[0];}),ans:pr[0],hint:'C장조 진행 · '+pr[0]};}};
+var EAR_Q=[];
+function buildEar(type){EAR_Q=[EAR[type](),EAR[type](),EAR[type]()];var h='';EAR_Q.forEach(function(q,i){h+='<div class="ear-q"><button class="ear-play" onclick="earPlay('+i+')">▶ 재생 '+(i+1)+'</button><div class="ear-opts">'+q.choices.map(function(c){return '<button class="ear-opt" onclick="earPick('+i+",'"+c+"'"+',this)">'+c+'</button>';}).join('')+'</div><div class="ear-r" id="earr'+i+'"></div></div>';});var w=document.getElementById('earWrap');if(w)w.innerHTML=h;}
+function earPlay(i){EAR_Q[i].play();}
+function earPick(i,label,btn){var q=EAR_Q[i];if(btn.parentElement.getAttribute('data-done'))return;btn.parentElement.setAttribute('data-done','1');var ok=label===q.ans;var opts=btn.parentElement.querySelectorAll('.ear-opt');opts.forEach(function(o){o.onclick=null;if(o.textContent===q.ans)o.classList.add('ok');else if(o===btn)o.classList.add('no');});var r=document.getElementById('earr'+i);r.innerHTML=(ok?'<b>정답!</b> ':'정답은 <b>'+q.ans+'</b> · ')+q.hint;r.classList.add('on');}
+
+/* ── 저장 ── */
+var KEY='theory66days';
+function load(){try{return JSON.parse(localStorage.getItem(KEY))||{}}catch(e){return{}}}
+function save(s){try{localStorage.setItem(KEY,JSON.stringify(s))}catch(e){}}
+var ST=load();if(!ST.done)ST.done={};
+function todayStr(){var d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
+function daysBetween(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
+
+function deepGuide(c){var G={'화성 기초':'<b>트레이닝 앱</b> → 화성분석의 <b>화음·진행 탭</b>에 오늘 배운 화음·진행을 직접 입력해 로마숫자·기능을 확인하고, <b>이론 탭 화성 사전</b>에서 소리로 비교하세요.','선율·대위':'<b>트레이닝 앱</b> → <b>선율 탭</b>에 선율을 입력해 비화성음(경과·보조·계류)을 분석하고, <b>화음 탭</b>으로 화성 문맥을 확인하세요.','리듬·짜임새':'<b>트레이닝 앱</b> → <b>박자 탭</b> 메트로놈으로 오늘의 리듬(당김음·헤미올라)을 쳐보고, <b>이론 탭</b>에서 짜임새 항목을 복습하세요.','표현·음색':'<b>트레이닝 앱</b> → <b>이론 탭</b>의 표현·관현악 항목을 다시 읽고, <b>화음 탭</b>에서 보이싱(밀집/개방)을 소리로 비교하세요.','형식·구조':'<b>트레이닝 앱</b> → <b>이론 탭</b>의 형식·쉥커 그래프를 보며 오늘 개념을 큰 구조로 확인하세요.','의미·해석':'<b>트레이닝 앱</b> → <b>이론 탭</b>의 의미·음형론 항목과 <b>진행 탭</b>으로 오늘의 음형·진행을 재현해보세요.','확장':'<b>트레이닝 앱</b> → <b>진행 탭</b>에 신리만(PLR)·반음계 진행을 입력해 색을 확인하고, <b>조성 탭</b>에서 음계(온음·옥타토닉)를 보세요.','지휘 언어':'<b>트레이닝 앱</b> → <b>지휘·박자 탭</b>에서 오늘 배운 도형·제스처를 연습하고, <b>청음 탭</b>으로 귀를 함께 훈련하세요.','신체별 역할':'<b>트레이닝 앱</b> → <b>지휘·박자 탭</b>에서 오른손/왼손·관절 감각을 도형에 실어 연습하세요.','비팅':'<b>트레이닝 앱</b> → <b>지휘·박자 탭</b>에서 오늘의 비팅(악티브/파시브·4박 도형)을 실제로 그려보세요.','모의고사':'<b>트레이닝 앱</b> → 약했던 주제의 탭(화음·진행·선율·조성)에서 집중 연습하고, 66앱 <b>오답 노트</b>로 마무리하세요.'};return G[c.ph]||G['화성 기초'];}
+function renderHome(){
+  var dn=Object.keys(ST.done).length,pct=Math.round(dn/66*100);
+  document.getElementById('pct').innerHTML=pct+'%<small>완료</small>';
+  document.getElementById('doneN').textContent=dn;
+  document.getElementById('streak').textContent=ST.streak||0;
+  document.getElementById('barfill').style.width=pct+'%';
+  var next=CUR.find(function(c){return !ST.done[c.d];});
+  var tc=document.getElementById('todayCard');
+  if(next){tc.className='today';tc.innerHTML='<div class="lab">오늘의 학습</div><div class="day">Day '+next.d+' · '+next.t+'</div><div class="ph">'+next.wk+'주 · '+next.ph+' · 비팅+청음+이론</div><button class="go" onclick="openDay('+next.d+')">오늘 공부 시작 →</button>';}
+  else{tc.className='today done';tc.innerHTML='<div class="lab">🎉 완주</div><div class="day">66일 전 과정을 마쳤어요!</div><div class="ph">아무 날이나 눌러 복습</div>';}
+  var weeks={};CUR.forEach(function(c){(weeks[c.wk]=weeks[c.wk]||[]).push(c);});
+  var curD=next?next.d:0,html='';
+  Object.keys(weeks).forEach(function(wk){var arr=weeks[wk];html+='<div class="wk"><div class="wk-lab"><b>'+wk+'주</b> · '+arr[0].ph+'</div><div class="wk-days">';arr.forEach(function(c){var cls='cell';if(ST.done[c.d])cls+=' done';if(c.ph==='모의고사')cls+=' exam';if(c.d===curD)cls+=' cur';html+='<button class="'+cls+'" onclick="openDay('+c.d+')">'+c.d+'</button>';});html+='</div></div>';});
+  document.getElementById('map').innerHTML=html;var wn=0,ww=ST.wrong||{};Object.keys(ww).forEach(function(d){wn+=ww[d].length;});var we=document.getElementById('wrongN');if(we)we.textContent=wn;
+}
+
+var Q_STATE=[],CUR_CUR=null;
+function openDay(n){
+  btStop();var c=CUR[n-1];if(!c)return;CUR_CUR=c;
+  Q_STATE=c.q.map(function(){return null;});
+  var bp=BEATPLAN[c.wk]||BEATPLAN[4];BT.meter=bp.m;BT.bpm=bp.bpm||72;LH.on=false;LH.ex='hold';
+  var ep=EARPLAN[c.wk]||EARPLAN[1];
+  var h='<div class="l-head"><div class="l-day">DAY '+c.d+' · '+c.wk+'주 · '+c.ph+'</div><div class="l-t">'+c.t+'</div><div class="l-lead">'+c.lead+'</div></div>';
+  // 1 비팅
+  h+='<div class="sec"><div class="sec-h"><span class="n">1</span>비팅 연습 <span class="tag">CONDUCTING</span></div>';
+  h+='<div class="lesson-card"><div class="lesson-h">🎼 오늘의 지휘 레슨 · '+bp.lt+'</div><ul class="lesson-ul">'+bp.lb.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul></div>';h+='<div class="bt-focus"><b>오늘 트레이너 포커스 · </b>'+bp.f+'</div>';
+  h+='<div class="bt-box"><div id="btSvgWrap"></div><div class="bt-ctrl"><div class="bt-meters">'+[2,3,4,6].map(function(m){return '<button class="btm'+(m===bp.m?' on':'')+'" data-m="'+m+'" onclick="btSetMeter('+m+')">'+m+'박</button>';}).join('')+'</div><button class="bt-play" id="btPlay" onclick="btToggle()">▶ 시작</button><div class="bt-bpm">BPM <span id="btBpmV">'+bp.bpm+'</span><input type="range" min="40" max="152" value="'+bp.bpm+'" oninput="btSetBpm(this.value)"><span class="bt-beatn" id="btBeatN">-</span></div></div>'+lhHTML()+'</div></div>';
+  // 2 청음
+  h+='<div class="sec"><div class="sec-h"><span class="n">2</span>청음 <span class="tag">EAR TRAINING</span></div>';
+  h+='<div class="ear-tgt"><b>오늘 목표 · </b>'+ep[1]+'. 재생을 듣고 고르세요.</div><div id="earWrap"></div></div>';
+  // 3 화성 실기
+  HARM.mode=HARMPLAN[c.wk]||'c-tri';
+  h+='<div class="sec"><div class="sec-h"><span class="n">3</span>화성 건반 실기 <span class="tag">HARMONY</span></div>';
+  h+='<div class="harm-tgt"><b>오늘 · </b>'+HARMDESC[HARM.mode]+'. 제시된 화음을 건반으로 쌓고 확인하세요.</div>';
+  h+='<div class="harm-box"><div class="harm-prompt" id="harmPrompt"></div>'+pianoSVG()+'<div class="harm-ctrl"><button class="harm-btn harm-chk" onclick="harmCheck()">확인 · 듣기</button><button class="harm-btn harm-new" onclick="harmNew()">새 문제</button></div><div class="harm-r" id="harmR"></div></div></div>';
+  // 3 개념
+  h+='<div class="sec"><div class="sec-h"><span class="n">4</span>오늘의 개념 <span class="tag">이론</span></div>';if(c.concept){h+='<div class="concept">'+c.concept+'</div>';}else{h+='<ul class="read">'+c.read.map(function(r){return '<li>'+r+'</li>';}).join('')+'</ul>';}h+='</div>';
+  // 4 문제
+  h+='<div class="sec"><div class="sec-h"><span class="n">5</span>문제 <span class="tag">'+c.q.length+'문항</span></div>';
+  c.q.forEach(function(q,i){h+=renderQ(q,i);});h+='<div class="scoreline" id="scoreline"></div></div>';
+  // 5 과제
+  h+='<div class="sec"><div class="sec-h"><span class="n">6</span>연습 과제</div><div class="task"><b>과제 · </b>'+c.task+'</div></div>';
+  h+='<div class="sec"><div class="sec-h"><span class="n">7</span>심화 연습 <span class="tag">TRAINING APP</span></div><div class="deep-card">'+deepGuide(c)+'</div></div>';
+  var da=ST.done[c.d];
+  h+='<button class="done-btn'+(da?' saved':'')+'" id="doneBtn" onclick="completeDay('+c.d+')">'+(da?'✓ 완료함 · 다시 저장':'오늘 완료 체크')+'</button>';
+  document.getElementById('lessonBody').innerHTML=h;
+  document.getElementById('home').style.display='none';
+  document.getElementById('lesson').style.display='block';
+  renderBeatSVG();buildEar(ep[0]);harmNew();window.scrollTo(0,0);updateScore();
+}
+function renderQ(q,i){var s='<div class="q" id="q'+i+'"><div><span class="q-tag '+q.k+'">'+(q.k==='mc'?'객관식':'단답')+'</span></div><div class="q-q">'+q.q+'</div>';
+ if(q.k==='mc'){q.c.forEach(function(op,j){s+='<button class="opt" onclick="pickMC('+i+','+j+')">'+op+'</button>';});s+='<div class="explain" id="ex'+i+'"></div>';}
+ else{s+='<input class="sa-in" id="sain'+i+'" placeholder="답을 입력…"><button class="sa-btn" onclick="revealSA('+i+')">정답 확인</button><div class="reveal" id="rev'+i+'"></div>';}
+ return s+'</div>';}
+function pickMC(i,j){if(Q_STATE[i]!==null)return;var c=CUR_CUR.q[i];document.querySelectorAll('#q'+i+' .opt').forEach(function(o,k){o.onclick=null;if(k===c.a)o.classList.add('correct');else if(k===j)o.classList.add('wrong');else o.classList.add('dim');});Q_STATE[i]=(j===c.a);var ex=document.getElementById('ex'+i);ex.innerHTML='해설 · '+c.e;ex.classList.add('on');updateScore();}
+function revealSA(i){var c=CUR_CUR.q[i];var r=document.getElementById('rev'+i);r.innerHTML='<div class="ans">정답 · '+c.a+'</div><div class="exp">'+c.e+'</div><div class="selfmark"><button class="ok" onclick="markSA('+i+',true,this)">맞음</button><button class="no" onclick="markSA('+i+',false,this)">틀림</button></div>';r.classList.add('on');}
+function markSA(i,ok,btn){Q_STATE[i]=ok;btn.parentElement.querySelectorAll('button').forEach(function(b){b.classList.remove('sel');});btn.classList.add('sel');updateScore();}
+function updateScore(){var ans=Q_STATE.filter(function(x){return x!==null;}).length,cor=Q_STATE.filter(function(x){return x===true;}).length;var sl=document.getElementById('scoreline');if(sl)sl.innerHTML=ans>0?('현재 <b>'+cor+'/'+ans+'</b> 정답 (전체 '+Q_STATE.length+'문항)'):'문제를 풀어보세요';}
+function showComplete(n){var d=CUR[n-1];var rec=(ST.done[n])||{c:0,t:0};var dn=Object.keys(ST.done).length;var pct=Math.round(dn/66*100);var nx=n<66?CUR[n]:null;var msgs=['잘했어요! 오늘의 벽돌 하나를 쌓았어요.','꾸준함이 실력이 돼요. 내일도 만나요.','한 걸음 더 깊어졌어요.','오늘의 집중, 훌륭했어요.','좋은 흐름이에요. 계속 이어가요.'];var enc=msgs[n%msgs.length];var lt=(BEATPLAN[d.wk]&&BEATPLAN[d.wk].lt)||'';var h='<div class="cmp"><div class="cmp-badge">🎉</div><div class="cmp-day">DAY '+n+' 완료 · '+d.wk+'주차</div><div class="cmp-t">'+d.t+'</div>';h+='<div class="cmp-stats"><div class="cmp-s"><div class="cmp-n">'+rec.c+'/'+rec.t+'</div><div class="cmp-l">문제 정답</div></div><div class="cmp-s"><div class="cmp-n">🔥 '+(ST.streak||1)+'</div><div class="cmp-l">연속일</div></div><div class="cmp-s"><div class="cmp-n">'+dn+'/66</div><div class="cmp-l">진도 '+pct+'%</div></div></div>';h+='<div class="cmp-sum"><b>오늘 다룬 것</b><br>지휘 레슨('+lt+') · 청음 · 화성 건반 · '+d.t+'</div>';if(nx){h+='<div class="cmp-next"><b>다음 · DAY '+(n+1)+'</b> — '+nx.t+'</div>';}else{h+='<div class="cmp-next"><b>🏁 66일 완주!</b> 화성부터 지휘까지, 정말 대단해요.</div>';}h+='<div class="cmp-enc">'+enc+'</div>';h+='<button class="done-btn" onclick="goHome()">학습 지도로 돌아가기</button>';if(nx){h+='<button class="cmp-next-btn" onclick="openDay('+(n+1)+')">다음 날 이어서 →</button>';}h+='</div>';document.getElementById('lessonBody').innerHTML=h;window.scrollTo(0,0);}
+function completeDay(n){var cor=Q_STATE.filter(function(x){return x===true;}).length;ST.done[n]={c:cor,t:Q_STATE.length};var wl=[];CUR_CUR.q.forEach(function(q,i){if(Q_STATE[i]===false)wl.push({q:q.q,ans:(q.k==='mc'?q.c[q.a]:q.a),e:q.e});});if(!ST.wrong)ST.wrong={};if(wl.length)ST.wrong[n]=wl;else delete ST.wrong[n];var t=todayStr();if(ST.last){var gap=daysBetween(ST.last,t);if(gap===1)ST.streak=(ST.streak||0)+1;else if(gap>1)ST.streak=1;else ST.streak=ST.streak||1;}else ST.streak=1;ST.last=t;save(ST);showComplete(n);}
+function bkCode(){try{return btoa(unescape(encodeURIComponent(JSON.stringify(ST))));}catch(e){return '';}}
+function openBackup(){btStop();var code=bkCode();var dn=Object.keys(ST.done||{}).length;var h='<button class="back" onclick="goHome()">← 학습 지도로</button><div class="l-head"><div class="l-day">백업 · 복원 · BACKUP</div><div class="l-t">진도 지키기</div><div class="l-lead">브라우저 저장은 기기·브라우저를 바꾸거나 데이터를 지우면 사라질 수 있어요. 백업해두면 언제든 되살려요. (현재 완료 '+dn+'일 · 연속 '+(ST.streak||0)+'일)</div></div>';h+='<div class="sec"><div class="sec-h"><span class="n">1</span>백업 <span class="tag">저장</span></div><div class="bk-btns"><button class="bk-act" onclick="copyBackup()">📋 코드 복사</button><button class="bk-act" onclick="downloadBackup()">⬇ 파일로 저장</button></div><textarea class="bk-area" readonly onclick="this.select()">'+code+'</textarea><div class="bk-msg" id="bkMsg1"></div></div>';h+='<div class="sec"><div class="sec-h"><span class="n">2</span>복원 <span class="tag">되살리기</span></div><button class="bk-act" style="width:100%" onclick="document.getElementById(\'bkFile\').click()">⬆ 백업 파일 불러오기</button><input type="file" id="bkFile" accept=".txt,text/plain" style="display:none" onchange="importFile(this)"><textarea class="bk-area" id="bkIn" placeholder="또는 백업 코드를 여기에 붙여넣기" style="margin-top:10px"></textarea><button class="done-btn" style="margin-top:9px" onclick="restoreProgress()">이 코드로 복원</button><div class="bk-msg" id="bkMsg"></div></div>';document.getElementById('lessonBody').innerHTML=h;document.getElementById('home').style.display='none';document.getElementById('lesson').style.display='block';window.scrollTo(0,0);}
+function copyBackup(){var code=bkCode();var msg=document.getElementById('bkMsg1');if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(code).then(function(){if(msg){msg.className='bk-msg ok';msg.textContent='복사됐어요! 메모 앱에 붙여넣어 보관하세요.';}},function(){if(msg){msg.className='bk-msg no';msg.textContent='자동 복사 실패 — 코드 칸을 눌러 직접 복사하세요.';}});}else{var t=document.querySelector('.bk-area');if(t)t.select();if(msg){msg.className='bk-msg';msg.textContent='코드 칸을 눌러 전체 선택 후 복사하세요.';}}}
+function downloadBackup(){var code=bkCode();var msg=document.getElementById('bkMsg1');try{var blob=new Blob([code],{type:'text/plain'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='theory66-backup.txt';document.body.appendChild(a);a.click();document.body.removeChild(a);if(msg){msg.className='bk-msg ok';msg.textContent='파일로 저장했어요 (theory66-backup.txt). 파일 앱에 보관하세요.';}}catch(e){if(msg){msg.className='bk-msg no';msg.textContent='파일 저장 실패 — 코드 복사를 이용하세요.';}}}
+function importFile(inp){var f=inp.files&&inp.files[0];if(!f)return;var r=new FileReader();r.onload=function(){var el=document.getElementById('bkIn');if(el)el.value=(r.result||'').trim();restoreProgress();};r.readAsText(f);}
+function restoreProgress(){var inp=document.getElementById('bkIn'),msg=document.getElementById('bkMsg');var v=(inp.value||'').trim();if(!v){msg.className='bk-msg no';msg.textContent='코드를 붙여넣어 주세요.';return;}try{var obj=JSON.parse(decodeURIComponent(escape(atob(v))));if(!obj||typeof obj!=='object'||!obj.done)throw 0;ST=obj;if(!ST.done)ST.done={};save(ST);msg.className='bk-msg ok';msg.textContent='복원됐어요! 완료 '+Object.keys(ST.done).length+'일 · 연속 '+(ST.streak||0)+'일. 학습 지도로 돌아가세요.';}catch(e){msg.className='bk-msg no';msg.textContent='코드가 올바르지 않아요. 복사한 코드 전체를 다시 붙여넣어 주세요.';}}
+function openWrong(){btStop();var w=ST.wrong||{};var days=Object.keys(w).sort(function(a,b){return a-b;});var h='<button class="back" onclick="goHome()">← 학습 지도로</button><div class="l-head"><div class="l-day">오답 노트 · REVIEW</div><div class="l-t">틀린 문제 다시 보기</div><div class="l-lead">완료한 날에서 틀린 문제만 모았어요. 개념이 헷갈리면 해당 Day를 다시 여세요.</div></div>';if(!days.length){h+='<div class="task">아직 틀린 문제가 없어요. 문제를 풀고 완료하면 여기 모여요.</div>';}else{days.forEach(function(d){var day=CUR[d-1];h+='<div class="ref-cat">Day '+d+' · '+day.t+'</div><ul class="ref-list">';w[d].forEach(function(it){h+='<li style="flex-direction:column;gap:5px;align-items:flex-start"><div style="font-weight:700;color:var(--text);line-height:1.5">'+it.q+'</div><div style="color:var(--mint);font-weight:700;font-size:.88rem">정답 · '+it.ans+'</div><div style="font-size:.82rem;color:var(--muted);line-height:1.5">'+it.e+'</div></li>';});h+='</ul>';});}document.getElementById('lessonBody').innerHTML=h;document.getElementById('home').style.display='none';document.getElementById('lesson').style.display='block';window.scrollTo(0,0);}
+function goHome(){btStop();document.getElementById('lesson').style.display='none';document.getElementById('home').style.display='block';renderHome();window.scrollTo(0,0);}
+
+/* ── 참고 사전: 기호·인물·구조 ── */
+var REF={
+sym:[
+['셈여림',[['ppp ~ fff','여리게~세게 (ppp<pp<p<mp<mf<f<ff<fff)'],['sfz','스포르찬도 — 그 음만 갑자기 세게'],['fp','포르테피아노 — 세게 쳤다 즉시 여리게'],['< / >','크레셴도 / 디크레셴도 (점점 세게/여리게)'],['morendo','사라지듯 (여리고 느리게)']]],
+['아티큘레이션',[['. 스타카토','짧게 끊어'],['▪ 스타카티시모','더 짧고 날카롭게'],['– 테누토','음가를 꽉 눌러 채워'],['> 악센트','그 음을 도드라지게'],['^ 마르카토','악센트+짧게, 못 박듯'],['⌒ 슬러','이어서 (레가토)'],['𝄐 페르마타','늘임표 — 길게 멈춤']]],
+['템포 변화',[['rit.','점점 느리게(ritardando)'],['rall.','점점 느리게(더 극적)'],['accel.','점점 빠르게'],['a tempo','원래 빠르기로'],['rubato','자유롭게 밀고 당겨'],['allargando','넓히며 (느려+커짐)'],['stringendo','조이며 (빨라+커짐)'],['meno / più mosso','덜 / 더 빠르게']]],
+['꾸밈음',[['tr 트릴','두 음 빠르게 번갈아'],['모르덴트','본음-옆음-본음 짧게'],['턴','위·본·아래·본 회전'],['앞꾸밈음','본음 앞 짧은 장식'],['아르페지오','화음을 펼쳐']]],
+['반복·진행 기호',[['𝄆 𝄇 도돌이표','되풀이'],['1. · 2. 엔딩','첫·둘째 번 다르게'],['D.C. 다 카포','처음부터 다시'],['D.S. 달 세뇨','세뇨(𝄋)부터 다시'],['Coda 𝄌','종결부로 건너뜀'],['Fine','여기서 끝']]],
+['표정말(nuance)',[['dolce','달콤하게'],['espressivo','표정 있게'],['cantabile','노래하듯'],['sostenuto','음을 유지하며'],['con brio','생기 있게'],['grazioso','우아하게'],['maestoso','장엄하게']]]
+],
+people:[
+['하인리히 쉥커','구조적 청취 — Ursatz(기본구조)로 표면 아래 골격을 봄'],
+['후고 리만','기능화성(T-S-D)·아고긱·변형이론(PLR)의 기초'],
+['윌리엄 캐플린','형식 기능 — 제시·전개·종지구로 형식을 읽음'],
+['헤포코스키 & 다시','소나타 이론 — 회전·MC·EEC·변형(deformation)'],
+['로버트 지어딩엔','갈랑 스키마타 — 18C 관용 표현을 목록화'],
+['레너드 마이어','기대 이론 — 정서는 기대의 생성·위반·충족'],
+['데이비드 후런','ITPRA — 지연된 해결이 주는 쾌감'],
+['요한 J. 푹스','대위법 교본 Gradus (종족 대위법 1~5종)'],
+['막스 루돌프','『지휘의 문법』 — 박자 도형·예비박 체계화'],
+['엘리자베스 그린','지휘 모토 "박이 아니라 의도의 명료함"'],
+['루돌프 라반','움직임 분석 — 에포트(무게·시간·공간·흐름)'],
+['리디아 괴어','"작품" 개념이 1800년경의 관념임을 논함'],
+['앨런 포트','무조 음악 집합론(pitch-class set)']
+],
+struct:[
+['소나타 형식','제시(주제군) → 발전 → 재현. 고전 교향곡의 뼈대'],
+['론도','후렴이 돌아옴 A-B-A-C-A'],
+['변주곡','주제를 반복하며 변형'],
+['푸가','주제-응답-간주부-스트레토의 모방 대위'],
+['악절(Period)','선행구(질문·반종지)+후속구(답·정격종지)'],
+['문장(Sentence)','기본악상 → 반복 → 전개·종지'],
+['Ursatz 기본구조','기본선율 3̂-2̂-1̂ + 베이스 아르페지오 I-V-I'],
+['종지 5종','정격 · 반 · 변격 · 위 · 피카르디'],
+['기능 순환 T-S-D','집 → 떠남 → 긴장 → 귀가'],
+['다이내믹 아치','긴장 곡선의 정점(보통 2/3 지점)으로 설계']
+]
+,
+conduct:[['익투스(ictus)','박이 떨어지는 정확한 점(최저점). 연주자가 여기에 맞춤'],['예비박','첫 소리 한 박 전 예고 — 들숨+템포·세기를 담아'],['반동(rebound)','익투스 후 튀어 오름 — 다음 박의 성격을 예고'],['오른손','시간(박·템포·구획) 담당 — 명료함이 우선'],['왼손','색(표현·다이내믹·큐) 담당 — 독립성이 관건'],['악티브 박','점 또렷 — 가속→최저점 급감속(억제)'],['파시브 박','등속으로 흐름 — 점 흐림(자유)'],['큐(cue)','진입 주자에게 시선+손을 미리 향해 예고'],['커트오프','소리를 끊는 작은 고리 동작'],['세분(subdivide)','느린 템포·rit에서 박을 잘게 쪼갬'],['데드 제스처','소리 없이 쉬는(멈춘) 동작'],['페르마타','늘임 — 시간을 늘려 그 순간에 머물기'],['라반 에포트','움직임의 4요소: 무게·시간·공간·흐름'],['미러링','양손이 같이 움직임 — 습관성은 지양, 강조용은 정답']]
+};
+var REFTABS=[['sym','음악 기호'],['people','인물'],['struct','구조'],['conduct','지휘 언어']];
+function openRef(key){btStop();var h='<button class="back" onclick="goHome()">← 학습 지도로</button><div class="l-head"><div class="l-day">참고 사전 · REFERENCE</div><div class="l-t">기호 · 인물 · 구조</div><div class="l-lead">공부 중 언제든 찾아보는 상설 참고. 순서·번호와 무관하게 항상 같은 내용이에요.</div></div><div class="ref-search"><input type="text" placeholder="기호·인물·구조 검색 — 예: sfz, 쉥커, 소나타" oninput="refSearch(this.value)"></div><div class="ref-nav">'+REFTABS.map(function(t){return '<button class="'+(t[0]===key?'on':'')+'" onclick="refSwitch(\''+t[0]+'\')">'+t[1]+'</button>';}).join('')+'</div><div id="refBody"></div>';document.getElementById('lessonBody').innerHTML=h;document.getElementById('home').style.display='none';document.getElementById('lesson').style.display='block';window.scrollTo(0,0);refSwitch(key);}
+function refSwitch(key){document.querySelectorAll('.ref-nav button').forEach(function(b,i){b.classList.toggle('on',REFTABS[i][0]===key);});var bd=document.getElementById('refBody');var html='';if(key==='sym'){REF.sym.forEach(function(cat){html+='<div class="ref-cat">'+cat[0]+'</div><ul class="ref-list">'+cat[1].map(function(x){return '<li><span class="term">'+x[0]+'</span><span class="desc">'+x[1]+'</span></li>';}).join('')+'</ul>';});}else{var arr=key==='people'?REF.people:key==='struct'?REF.struct:REF.conduct;html='<ul class="ref-list">'+arr.map(function(x){return '<li><span class="term">'+x[0]+'</span><span class="desc">'+x[1]+'</span></li>';}).join('')+'</ul>';}bd.innerHTML=html;}
+
+function refSearch(q){q=(q||'').trim().toLowerCase();var bd=document.getElementById('refBody');if(!bd)return;if(!q){document.querySelectorAll('.ref-nav button').forEach(function(b,i){if(i===0)b.classList.add('on');else b.classList.remove('on');});refSwitch('sym');return;}
+var idx=[];REF.sym.forEach(function(cat){cat[1].forEach(function(x){idx.push(['음악 기호',x[0],x[1]]);});});REF.people.forEach(function(x){idx.push(['인물',x[0],x[1]]);});REF.struct.forEach(function(x){idx.push(['구조',x[0],x[1]]);});REF.conduct.forEach(function(x){idx.push(['지휘 언어',x[0],x[1]]);});
+var res=idx.filter(function(it){return (it[1]+' '+it[2]).toLowerCase().indexOf(q)>=0;});
+document.querySelectorAll('.ref-nav button').forEach(function(b){b.classList.remove('on');});
+bd.innerHTML=res.length?'<ul class="ref-list">'+res.map(function(it){return '<li><span class="term">'+it[1]+'</span><span class="desc"><span style="color:var(--slate);font-size:.72rem;font-weight:700">['+it[0]+'] </span>'+it[2]+'</span></li>';}).join('')+'</ul>':'<div style="padding:20px;text-align:center;color:var(--muted)">검색 결과 없음</div>';}
+
+
+/* ── 화성 건반 실기 (2옥타브·근음·전위 진행) ── */
+var QUAL={triad:[['장3화음',[0,4,7]],['단3화음',[0,3,7]],['증3화음',[0,4,8]],['감3화음',[0,3,6]]],seventh:[['maj7',[0,4,7,11]],['딸림7(7)',[0,4,7,10]],['m7',[0,3,7,10]],['m7♭5',[0,3,6,10]],['dim7',[0,3,6,9]]]};
+var NOTENAMES=['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+var HARMPLAN={1:'c-tri',2:'c-7th',3:'root-tri',4:'root-7th',5:'inv-tri',6:'inv-7th',7:'roman',8:'roman7',9:'roman',10:'roman7',11:'roman7'};
+var HARMDESC={'c-tri':'C 위 3화음 쌓기 (기본기)','c-7th':'C 위 7화음 쌓기','root-tri':'여러 근음의 3화음 (이조)','root-7th':'여러 근음의 7화음','inv-tri':'3화음 전위 — 지정된 자리로','inv-7th':'7화음 전위','roman':'조성 안 로마숫자 화음 (I·IV·V…를 C장조에서 직접)','roman7':'로마숫자 7화음 (V7·ii7…)'};
+var HARM={mode:'c-tri',cur:null,sel:[]};
+function noteName(m){return NOTENAMES[m%12];}
+function pianoSVG(){var W=336,whitePCs=[0,2,4,5,7,9,11],whiteMidis=[];for(var oct=0;oct<2;oct++)whitePCs.forEach(function(pc){whiteMidis.push(60+oct*12+pc);});var ww=W/whiteMidis.length;var s='<svg viewBox="0 0 '+W+' 132" class="piano">';whiteMidis.forEach(function(m,i){s+='<rect id="pk'+m+'" class="pk pkw" x="'+(i*ww)+'" y="0" width="'+(ww-1)+'" height="130" rx="3" onclick="harmKey('+m+')"/><text x="'+(i*ww+ww/2)+'" y="123" text-anchor="middle" font-size="7.5" fill="#5c6670" pointer-events="none">'+noteName(m)+'</text>';});var lw={1:0,3:2,6:5,8:7,10:9};for(var oct=0;oct<2;oct++){[1,3,6,8,10].forEach(function(pc){var m=60+oct*12+pc;var li=whiteMidis.indexOf(60+oct*12+lw[pc]);var x=(li+1)*ww-ww*0.32;s+='<rect id="pk'+m+'" class="pk pkb" x="'+x+'" y="0" width="'+(ww*0.64)+'" height="82" rx="2" onclick="harmKey('+m+')"/>';});}return s+'</svg>';}
+function genHarm(mode){if(mode==='roman'||mode==='roman7'){var KEY=60;var D3={I:[0,4,7],ii:[2,5,9],iii:[4,7,11],IV:[5,9,12],V:[7,11,14],vi:[9,12,16]};var D7={I:[0,4,7,11],ii:[2,5,9,12],IV:[5,9,12,16],V:[7,11,14,17],vi:[9,12,16,19]};var isR7=mode==='roman7';var pool=isR7?['I','ii','IV','V','vi']:['I','ii','iii','IV','V','vi'];var r=pool[rnd(pool.length)];var iv=(isR7?D7:D3)[r];var notes=iv.map(function(x){return x+KEY;});var label='C장조에서 <b>'+r+(isR7?'7':'')+'</b>';while(Math.max.apply(null,notes)>83){notes=notes.map(function(n){return n-12;});}notes.sort(function(a,b){return a-b;});return{label:label,notes:notes};}var isSev=mode.indexOf('7')>=0;var pool=isSev?QUAL.seventh:QUAL.triad;var q=pool[rnd(pool.length)];var root=60;if(mode.indexOf('root')>=0||mode.indexOf('inv')>=0)root=[60,62,64,65,67][rnd(5)];var notes=q[1].map(function(x){return x+root;});var label=noteName(root)+'음 위 <b>'+q[0]+'</b>';if(mode.indexOf('inv')>=0){var inv=1+rnd(q[1].length-1);for(var k=0;k<inv;k++){var mn=Math.min.apply(null,notes);notes[notes.indexOf(mn)]=mn+12;}label+=' · <b>'+inv+'전위</b>';}notes.sort(function(a,b){return a-b;});while(Math.max.apply(null,notes)>83){notes=notes.map(function(n){return n-12;});}while(Math.min.apply(null,notes)<60){notes=notes.map(function(n){return n+12;});}notes.sort(function(a,b){return a-b;});return{label:label,notes:notes};}
+function harmNew(){HARM.cur=genHarm(HARM.mode);HARM.sel=[];for(var m=60;m<=83;m++){var k=document.getElementById('pk'+m);if(k)k.classList.remove('sel','ok','no');}var pr=document.getElementById('harmPrompt');if(pr)pr.innerHTML=HARM.cur.label+' 쌓기';var r=document.getElementById('harmR');if(r){r.textContent='';r.className='harm-r';}}
+function harmKey(m){var i=HARM.sel.indexOf(m);var k=document.getElementById('pk'+m);if(i>=0){HARM.sel.splice(i,1);if(k)k.classList.remove('sel');}else{HARM.sel.push(m);if(k)k.classList.add('sel');}}
+function harmCheck(){if(!HARM.cur)return;var ans=HARM.cur.notes.slice().sort(function(a,b){return a-b;});var sel=HARM.sel.slice().sort(function(a,b){return a-b;});var ok=ans.length===sel.length&&ans.every(function(v,i){return v===sel[i];});for(var m=60;m<=83;m++){var k=document.getElementById('pk'+m);if(!k)continue;k.classList.remove('sel');if(ans.indexOf(m)>=0)k.classList.add('ok');else if(HARM.sel.indexOf(m)>=0)k.classList.add('no');}playChord(ans,1.5);var r=document.getElementById('harmR');if(r){r.textContent=ok?'정답! ('+ans.map(noteName).join(' ')+')':'다시 — 정답은 초록 건반 ('+ans.map(noteName).join(' ')+')';r.className='harm-r '+(ok?'ok':'no');}}renderHome();
+</script>
+</body>
+</html>
