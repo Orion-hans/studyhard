@@ -196,6 +196,19 @@ header .sub{font-size:.78rem;color:var(--muted);font-family:var(--mono);font-wei
 .feel-item{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:9px;}
 .feel-d{font-size:.76rem;font-weight:700;color:var(--coral);margin-bottom:5px;}
 .feel-x{font-size:.92rem;color:var(--body);line-height:1.6;}
+.col-tgt{background:var(--surface2);border-left:2px solid var(--amber);border-radius:9px;padding:10px 12px;font-size:.86rem;color:var(--body);line-height:1.55;margin-bottom:11px;}
+.col-new{display:flex;align-items:center;gap:11px;background:linear-gradient(135deg,rgba(245,209,143,.12),rgba(111,233,205,.05));border:1px solid var(--line2);border-radius:11px;padding:11px 13px;margin-bottom:12px;}
+.col-new i{width:30px;height:30px;border-radius:8px;flex:0 0 auto;border:1px solid rgba(255,255,255,.25);}
+.col-new div{flex:1;font-size:.86rem;line-height:1.5;color:var(--body);}
+.col-new span{font-size:.8rem;color:var(--muted);}
+.col-hear{background:var(--surface2);border:1px solid var(--line2);border-radius:8px;padding:8px 11px;font-size:.8rem;font-weight:700;color:var(--text);flex:0 0 auto;}
+.col-q{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:11px 12px;margin-bottom:10px;}
+.col-opts{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px;}
+.col-chip{display:flex;align-items:center;gap:7px;background:var(--surface2);border:1px solid var(--line2);border-radius:9px;padding:9px 10px;font-size:.82rem;font-weight:600;color:var(--body);text-align:left;}
+.col-chip i{width:15px;height:15px;border-radius:4px;flex:0 0 auto;border:1px solid rgba(255,255,255,.25);}
+.col-chip.ok{border-color:var(--mint);background:rgba(111,233,205,.16);color:var(--text);}
+.col-chip.no{border-color:var(--coral);background:rgba(255,133,117,.14);}
+.col-again{width:100%;background:var(--surface2);border:1px solid var(--line2);border-radius:9px;padding:10px;font-size:.85rem;font-weight:700;color:var(--muted);}
 /* concept rich */
 .concept{font-size:.96rem;line-height:1.74;color:var(--body);}
 .concept p{margin:0 0 13px;}.concept b{color:var(--text);}
@@ -802,6 +815,28 @@ seventh:function(){var q=[['maj7',[0,4,7,11]],['딸림7(7)',[0,4,7,10]],['m7',[0
 interval:function(){var q=[['장2도',2],['단3도',3],['장3도',4],['완전4도',5],['트라이톤',6],['완전5도',7],['장6도',9],['완전8도',12]];var p=q[rnd(q.length)],r=60+rnd(5);return{play:function(){playMel([r,r+p[1]],0.75);},choices:pick4(q,p[0]),ans:p[0],hint:p[0]+' = '+p[1]+'반음'};},
 cadence:function(){var K=60,CH={I:[K,K+4,K+7],IV:[K+5,K+9,K+12],V:[K+7,K+11,K+14],vi:[K+9,K+12,K+16]};var q=[['정격 종지',['I','V','I']],['반종지',['I','IV','V']],['변격 종지',['I','IV','I']],['위종지',['I','V','vi']]];var p=q[rnd(4)];return{play:function(){playSeq(p[1].map(function(r){return CH[r];}),0.95);},choices:q.map(function(x){return x[0];}),ans:p[0],hint:'진행: '+p[1].join('→')};},inversion:function(){var T=[['장3화음',[0,4,7]],['단3화음',[0,3,7]]],S=[['maj7',[0,4,7,11]],['딸림7',[0,4,7,10]],['m7',[0,3,7,10]]];var isS=rnd(2)===1;var q=(isS?S:T)[rnd(isS?3:2)];var root=60+rnd(5);var inv=rnd(isS?4:3);var notes=q[1].map(function(x){return x+root;});for(var k=0;k<inv;k++){var mn=Math.min.apply(null,notes);notes[notes.indexOf(mn)]=mn+12;}notes.sort(function(a,b){return a-b;});var L=['근음 위치','1전위','2전위','3전위'].slice(0,isS?4:3);return{play:function(){playChord(notes,1.5);},choices:L,ans:L[inv],hint:q[0]+' '+L[inv]+' (베이스 = '+['근음','3음','5음','7음'][inv]+')'};},mode:function(){var M=[['이오니안(장)',[0,2,4,5,7,9,11]],['도리안',[0,2,3,5,7,9,10]],['프리지안',[0,1,3,5,7,8,10]],['리디안',[0,2,4,6,7,9,11]],['믹솔리디안',[0,2,4,5,7,9,10]],['에올리안(단)',[0,2,3,5,7,8,10]]];var m=M[rnd(M.length)];var r=57+rnd(8);var notes=m[1].map(function(x){return x+r;}).concat([r+12]);return{play:function(){playMel(notes,0.42);},choices:M.map(function(x){return x[0];}),ans:m[0],hint:m[0]+' 음계 — 특성음에 주목'};},progression:function(){var K=60,CH={I:[K,K+4,K+7],ii:[K+2,K+5,K+9],iii:[K+4,K+7,K+11],IV:[K+5,K+9,K+12],V:[K+7,K+11,K+14],vi:[K+9,K+12,K+16]};var A=57,CM={i:[A,A+3,A+7],'ii\u00b0':[A+2,A+5,A+8],iv:[A+5,A+8,A+12],V:[A+7,A+11,A+14],VI:[A+8,A+12,A+15]};var P=[['I–IV–V–I',CH,['I','IV','V','I']],['I–vi–IV–V',CH,['I','vi','IV','V']],['ii–V–I',CH,['ii','V','I']],['IV–V–I',CH,['IV','V','I']],['I–V–vi–IV',CH,['I','V','vi','IV']],['I–ii–V–I',CH,['I','ii','V','I']],['i–iv–V–i (단조)',CM,['i','iv','V','i']],['ii\u00b0–V–i (단조)',CM,['ii\u00b0','V','i']]];var pr=P[rnd(P.length)];return{play:function(){playSeq(pr[2].map(function(r){return pr[1][r];}),0.85);},choices:P.map(function(x){return x[0];}),ans:pr[0],hint:pr[0]};}};
 var EAR_Q=[];
+var PAL=[{q:'maj',n:'장3화음',c:'#f2c14e',set:[0,4,7],f:'환하고 트인 — 도착·기둥의 색'},{q:'min',n:'단3화음',c:'#5b6fae',set:[0,3,7],f:'어둑하고 포근한 — 내면으로 돌린 시선'},{q:'dom7',n:'딸림7',c:'#e8613c',set:[0,4,7,10],f:'환한데 안절부절 — 다음으로 밀어내는 색'},{q:'maj7',n:'장7',c:'#5ecfae',set:[0,4,7,11],f:'나른하게 번지는 — 도착해놓고 머무는 색'},{q:'min7',n:'단7',c:'#3f8f8f',set:[0,3,7,10],f:'어둑하고 나른한 — 흘러가는 순환의 색'},{q:'dim',n:'감3화음',c:'#8f7fb0',set:[0,3,6],f:'날 선 조마조마함 — 떠밀리는 색'},{q:'aug',n:'증3화음',c:'#b060a8',set:[0,4,8],f:'붕 뜬 몽롱함 — 중력이 끊긴 색'},{q:'m7b5',n:'반감7',c:'#6d8299',set:[0,3,6,10],f:'스산하고 아슬아슬 — 단조 종지의 문턱'},{q:'dim7',n:'감7',c:'#c0392b',set:[0,3,6,9],f:'팽팽하게 곤두선 — 어디로든 열린 경첩'},{q:'sus4',n:'서스4',c:'#9db8c9',set:[0,5,7],f:'맺지 못하고 열린 — 유예의 색'},{q:'sus2',n:'서스2',c:'#a8cfd8',set:[0,2,7],f:'탁 트여 비어 있는 — 판단 유보의 색'},{q:'add9',n:'애드나인',c:'#a3d977',set:[0,2,4,7],f:'맑게 반짝임 한 겹 — 순진함을 지킨 색'},{q:'maj6',n:'장6',c:'#f0a868',set:[0,4,7,9],f:'말랑한 복고 — 여운의 색'},{q:'min6',n:'단6',c:'#8a9a5b',set:[0,3,7,9],f:'아련한 회상 — 그늘에 빛 한 줄기'},{q:'mM7',n:'단장7',c:'#7a9ec4',set:[0,3,7,11],f:'서늘하고 묘한 — 뒤틀린 심리의 색'},{q:'maj9',n:'장9',c:'#b7a6e0',set:[0,2,4,7,11],f:'구름처럼 번지는 — 시간을 넓히는 색'},{q:'dom9',n:'딸림9',c:'#e0913f',set:[0,2,4,7,10],f:'무르익은 추진 — 정점 직전의 풍만함'},{q:'min9',n:'단9',c:'#2f6f6a',set:[0,2,3,7,10],f:'깊고 촉촉한 — 습기 어린 단조'},{q:'69',n:'식스나인',c:'#efe3b0',set:[0,2,4,7,9],f:'가볍게 떠 있는 — 세련된 마감'},{q:'7sus4',n:'딸림7 서스4',c:'#c8ab7a',set:[0,5,7,10],f:'웅성이는 지연 — 해결 직전의 뜸'},{q:'7b9',n:'딸림7♭9',c:'#7d2b2b',set:[0,4,7,10,13],f:'검붉은 비탄 — 그늘을 드리운 딸림'},{q:'7s9',n:'딸림7♯9',c:'#a3327a',set:[0,4,7,10,15],f:'긁히는 절규 — 장·단이 부딪는 색'},{q:'7s11',n:'딸림7♯11',c:'#3fb2c9',set:[0,4,7,10,18],f:'광채 어린 부양 — 리디안의 빛'},{q:'7b13',n:'딸림7♭13',c:'#6b4a2f',set:[0,4,7,10,20],f:'내려앉는 체념 — 무거운 그늘'}];
+var CQ=[];
+function palUn(d){return Math.min(PAL.length,2+Math.floor(d/3));}
+function palShuf(a){for(var i=a.length-1;i>0;i--){var j=rnd(i+1),t=a[i];a[i]=a[j];a[j]=t;}return a;}
+function palWeak(u){var arr=[];for(var i=0;i<u;i++){var m=(ST.cmem&&ST.cmem[PAL[i].q])||{s:0,c:0};var w=1+Math.max(0,m.s-m.c)*3+(m.s===0?4:0);for(var k=0;k<w;k++)arr.push(i);}return arr[rnd(arr.length)];}
+function buildColor(d){var u=palUn(d);var fresh=(d%3===0)?u-1:-1;CQ=[];
+  for(var i=0;i<3;i++){var ti=(i===0&&fresh>=0)?fresh:palWeak(u);var root=60+rnd(8);
+    var notes=PAL[ti].set.map(function(x){return x+root;});
+    var pool=[];for(var j=0;j<u;j++)if(j!==ti)pool.push(j);palShuf(pool);
+    var ch=palShuf([ti].concat(pool.slice(0,Math.min(3,pool.length))));
+    CQ.push({ti:ti,notes:notes,ch:ch});}
+  var h2='';
+  if(fresh>=0){h2+='<div class="col-new"><i style="background:'+PAL[fresh].c+'"></i><div><b>오늘 새 색 · '+PAL[fresh].n+'</b><br><span>'+PAL[fresh].f+'</span></div><button class="col-hear" onclick="colHear('+fresh+')">▶ 듣기</button></div>';}
+  CQ.forEach(function(q,i){h2+='<div class="col-q"><button class="ear-play" onclick="colPlay('+i+')">▶ 재생 '+(i+1)+'</button><div class="col-opts">'+q.ch.map(function(j){return '<button class="col-chip" onclick="colPick('+i+','+j+',this)"><i style="background:'+PAL[j].c+'"></i>'+PAL[j].n+'</button>';}).join('')+'</div><div class="ear-r" id="colr'+i+'"></div></div>';});
+  h2+='<button class="col-again" onclick="buildColor('+d+')">↻ 새 문제</button>';
+  var w=document.getElementById('colWrap');if(w)w.innerHTML=h2;}
+function colHear(j){playChord(PAL[j].set.map(function(x){return x+60;}),1.6);}
+function colPlay(i){playChord(CQ[i].notes,1.5);}
+function colPick(i,j,btn){var q=CQ[i];var box=btn.parentElement;if(box.getAttribute('data-done'))return;box.setAttribute('data-done','1');
+  var ok=(j===q.ti);if(!ST.cmem)ST.cmem={};var key=PAL[q.ti].q;var m=ST.cmem[key]||{s:0,c:0};m.s++;if(ok)m.c++;ST.cmem[key]=m;save(ST);
+  box.querySelectorAll('.col-chip').forEach(function(o,k){o.onclick=null;if(q.ch[k]===q.ti)o.classList.add('ok');else if(o===btn)o.classList.add('no');});
+  var r=document.getElementById('colr'+i);if(r)r.innerHTML=(ok?'<b>정답!</b> ':'정답은 <b>'+PAL[q.ti].n+'</b> — ')+PAL[q.ti].f;}
 function buildEar(type){var pool=Array.isArray(type)?type:[type];EAR_Q=[0,0,0].map(function(){return EAR[pool[rnd(pool.length)]]();});var h='';EAR_Q.forEach(function(q,i){h+='<div class="ear-q"><button class="ear-play" onclick="earPlay('+i+')">▶ 재생 '+(i+1)+'</button><div class="ear-opts">'+q.choices.map(function(c){return '<button class="ear-opt" onclick="earPick('+i+",'"+c+"'"+',this)">'+c+'</button>';}).join('')+'</div><div class="ear-r" id="earr'+i+'"></div></div>';});var w=document.getElementById('earWrap');if(w)w.innerHTML=h;}
 function earPlay(i){EAR_Q[i].play();}
 function earPick(i,label,btn){var q=EAR_Q[i];if(btn.parentElement.getAttribute('data-done'))return;btn.parentElement.setAttribute('data-done','1');var ok=label===q.ans;var opts=btn.parentElement.querySelectorAll('.ear-opt');opts.forEach(function(o){o.onclick=null;if(o.textContent===q.ans)o.classList.add('ok');else if(o===btn)o.classList.add('no');});var r=document.getElementById('earr'+i);r.innerHTML=(ok?'<b>정답!</b> ':'정답은 <b>'+q.ans+'</b> · ')+q.hint;r.classList.add('on');}
@@ -845,27 +880,30 @@ function openDay(n){
   // 2 청음
   h+='<div class="sec"><div class="sec-h"><span class="n">2</span>청음 <span class="tag">EAR TRAINING</span></div>';
   h+='<div class="ear-tgt"><b>오늘 목표 · </b>'+ep[1]+'. 재생을 듣고 고르세요.</div><div id="earWrap"></div></div>';
+  // 3 화성 색 각인
+  h+='<div class="sec"><div class="sec-h"><span class="n">3</span>화성 색 각인 <span class="tag">COLOR</span></div>';
+  h+='<div class="col-tgt"><b>지금까지 익힌 색 '+palUn(c.d)+'가지</b> · 근음은 매번 달라져요 — 음높이가 아니라 <b>색(질)</b>을 들으세요.</div><div id="colWrap"></div></div>';
   // 3 화성 실기
   HARM.mode=HARMPLAN[c.wk]||'c-tri';
-  h+='<div class="sec"><div class="sec-h"><span class="n">3</span>화성 건반 실기 <span class="tag">HARMONY</span></div>';
+  h+='<div class="sec"><div class="sec-h"><span class="n">4</span>화성 건반 실기 <span class="tag">HARMONY</span></div>';
   h+='<div class="harm-tgt"><b>오늘 · </b>'+(Array.isArray(HARM.mode)?'누적 혼합 — '+HARM.mode.map(function(m){return HARMDESC[m];}).join(' / '):HARMDESC[HARM.mode])+'. 제시된 화음을 건반으로 쌓고 확인하세요.</div>';
   h+='<div class="harm-box"><div class="harm-prompt" id="harmPrompt"></div>'+pianoSVG()+'<div class="harm-ctrl"><button class="harm-btn harm-chk" onclick="harmCheck()">확인 · 듣기</button><button class="harm-btn harm-new" onclick="harmNew()">새 문제</button></div><div class="harm-r" id="harmR"></div></div></div>';
   // 3 개념
-  h+='<div class="sec"><div class="sec-h"><span class="n">4</span>오늘의 개념 <span class="tag">이론</span></div>';if(c.concept){h+='<div class="concept">'+c.concept+'</div>';}else{h+='<ul class="read">'+c.read.map(function(r){return '<li>'+r+'</li>';}).join('')+'</ul>';}h+='</div>';
+  h+='<div class="sec"><div class="sec-h"><span class="n">5</span>오늘의 개념 <span class="tag">이론</span></div>';if(c.concept){h+='<div class="concept">'+c.concept+'</div>';}else{h+='<ul class="read">'+c.read.map(function(r){return '<li>'+r+'</li>';}).join('')+'</ul>';}h+='</div>';
   // 4 문제
-  h+='<div class="sec"><div class="sec-h"><span class="n">5</span>문제 <span class="tag">'+c.q.length+'문항</span></div>';
+  h+='<div class="sec"><div class="sec-h"><span class="n">6</span>문제 <span class="tag">'+c.q.length+'문항</span></div>';
   c.q.forEach(function(q,i){h+=renderQ(q,i);});h+='<div class="scoreline" id="scoreline"></div></div>';
   // 5 과제
-  if(c.think){h+='<div class="sec"><div class="sec-h"><span class="n">6</span>사고 확장 <span class="tag">THINK</span></div><div class="think-card"><ul class="think-ul">'+c.think.map(function(q){return '<li>'+q+'</li>';}).join('')+'</ul><div class="think-note">정답이 없는 질문이에요 — 자기 말로 한 줄이라도 적어보면 개념이 내 것이 됩니다.</div></div></div>';}
-  h+='<div class="sec"><div class="sec-h"><span class="n">7</span>연습 과제</div><div class="task"><b>과제 · </b>'+c.task+'</div></div>';
-  h+='<div class="sec"><div class="sec-h"><span class="n">8</span>심화 연습 <span class="tag">TRAINING APP</span></div><div class="deep-card">'+deepGuide(c)+'</div></div>';
-  if(c.listen){h+='<div class="sec"><div class="sec-h"><span class="n">9</span>오늘의 감상 <span class="tag">ART</span></div><div class="listen-card"><div class="listen-t">🎧 '+c.listen[0]+'</div><div class="listen-p">'+c.listen[1]+'</div><div class="listen-hint">먼저 아무 생각 없이 한 번 — 그다음 오늘 배운 귀로 한 번.</div></div><div class="feel-wrap"><textarea class="feel-area" id="feelIn" placeholder="오늘 가장 아름다웠던 순간, 한 줄 (선택)">'+esc((ST.feel&&ST.feel[c.d])||'')+'</textarea><div class="feel-row"><button class="feel-save" onclick="saveFeel('+c.d+')">한 줄 남기기</button><span class="feel-msg" id="feelMsg"></span></div></div></div>';}
+  if(c.think){h+='<div class="sec"><div class="sec-h"><span class="n">7</span>사고 확장 <span class="tag">THINK</span></div><div class="think-card"><ul class="think-ul">'+c.think.map(function(q){return '<li>'+q+'</li>';}).join('')+'</ul><div class="think-note">정답이 없는 질문이에요 — 자기 말로 한 줄이라도 적어보면 개념이 내 것이 됩니다.</div></div></div>';}
+  h+='<div class="sec"><div class="sec-h"><span class="n">8</span>연습 과제</div><div class="task"><b>과제 · </b>'+c.task+'</div></div>';
+  h+='<div class="sec"><div class="sec-h"><span class="n">9</span>심화 연습 <span class="tag">TRAINING APP</span></div><div class="deep-card">'+deepGuide(c)+'</div></div>';
+  if(c.listen){h+='<div class="sec"><div class="sec-h"><span class="n">10</span>오늘의 감상 <span class="tag">ART</span></div><div class="listen-card"><div class="listen-t">🎧 '+c.listen[0]+'</div><div class="listen-p">'+c.listen[1]+'</div><div class="listen-hint">먼저 아무 생각 없이 한 번 — 그다음 오늘 배운 귀로 한 번.</div></div><div class="feel-wrap"><textarea class="feel-area" id="feelIn" placeholder="오늘 가장 아름다웠던 순간, 한 줄 (선택)">'+esc((ST.feel&&ST.feel[c.d])||'')+'</textarea><div class="feel-row"><button class="feel-save" onclick="saveFeel('+c.d+')">한 줄 남기기</button><span class="feel-msg" id="feelMsg"></span></div></div></div>';}
   var da=ST.done[c.d];
   h+='<button class="done-btn'+(da?' saved':'')+'" id="doneBtn" onclick="completeDay('+c.d+')">'+(da?'✓ 완료함 · 다시 저장':'오늘 완료 체크')+'</button>';
   document.getElementById('lessonBody').innerHTML=h;
   document.getElementById('home').style.display='none';
   document.getElementById('lesson').style.display='block';
-  renderBeatSVG();buildEar(ep[0]);harmNew();window.scrollTo(0,0);updateScore();
+  renderBeatSVG();buildEar(ep[0]);buildColor(c.d);harmNew();window.scrollTo(0,0);updateScore();
 }
 function renderQ(q,i){var s='<div class="q" id="q'+i+'"><div><span class="q-tag '+q.k+'">'+(q.k==='mc'?'객관식':'단답')+'</span></div><div class="q-q">'+q.q+'</div>';
  if(q.k==='mc'){q.c.forEach(function(op,j){s+='<button class="opt" onclick="pickMC('+i+','+j+')">'+op+'</button>';});s+='<div class="explain" id="ex'+i+'"></div>';}
