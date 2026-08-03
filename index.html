@@ -1112,6 +1112,20 @@ function kmFeel(deg,q,sev){
   else if(deg===2&&k.m)ex=' \ud654\uc131\ub2e8\uc74c\uacc4\uc758 \uc774\ub054\uc74c \ub54c\ubb38\uc5d0 \ub2e8\uc870\uc5d0\uc11c\ub3c4 \uc7a5\ud654\uc74c\uc774\uc5d0\uc694.';
   return base+' \u2014 '+role+'.'+ex;
 }
+
+function kmConduct(deg,q,sev,inv){
+  var fn=KM_FN[deg], hand='', scene='';
+  if(q==='dim'){hand='작고 <b>날카롭게</b> — 오래 머물지 말고 곧바로 다음 박으로 넘겨요.';scene='경과\u00b7연결로 스치는 자리. 여기서 멈추면 소리가 정체돼요.';}
+  else if(sev&&deg===6){hand='무게를 실어 <b>아래로</b> — 베이스를 두껍게 두고 상성부는 눌러요.';scene='토닉 직전, 반음으로 밀어 올리는 문턱.';}
+  else if(fn==='D'){hand='악티브로 <b>점을 세워</b> 해결을 예고해요. 다음 박이 목적지예요.';scene='종지 직전, 긴장이 가장 센 자리.';}
+  else if(fn==='S'){hand='레가토로 <b>이어 끌며</b> 다음을 준비 — 크기는 유지해요.';scene='악구가 밖으로 나가기 시작하는 자리.';}
+  else {hand='무게를 내려놓고 <b>파시브로</b> — 점을 세게 찍지 않아요.';scene='악구가 도착해 쉬는 자리.';}
+  if(sev&&fn==='T'&&deg===0)hand='파시브 레가토로 — <b>점을 찍지 말고</b> 여운을 남겨요.';
+  if(inv===1)hand+=' 베이스가 3음이라 <b>가볍게</b> — 저역을 두껍게 두지 않아요.';
+  else if(inv===2)hand+=' 베이스가 5음이라 <b>스스로 서지 못해요</b> — 다음 화음으로 바로 이어요.';
+  else if(inv===3)hand+=' 베이스가 7음이라 <b>반드시 아래로</b> 풀려요 — 그 성부를 놓치지 마세요.';
+  return [hand,scene];
+}
 function kmRender(){
   var k=kmKey(), h='', d, i;
   h+='<div class="km-keys">';
@@ -1146,7 +1160,7 @@ function kmRender(){
       +'<button class="km-play" onclick="playChord(['+ms.join(',')+'],1.5)">\u25b6</button></div>'
       +'<div class="km-pcs">'+pcs+(KM.inv>0?' \u00b7 \ubca0\uc774\uc2a4 '+kmName(((ms[0]%12)+12)%12):'')+'</div>'
       +'<div class="km-staff">'+kmStaff(ms)+'</div>'
-      +'<div class="km-feel">'+kmFeel(d,q,KM.sev)+'</div></div>';
+      +'<div class="km-feel">'+kmFeel(d,q,KM.sev)+'</div>'+'<div class="gs-rows" style="margin-top:8px">'+'<div class="gs-r"><span class="gs-k">\uc190</span><span class="gs-v">'+kmConduct(d,q,KM.sev,KM.inv)[0]+'</span></div>'+'<div class="gs-r"><span class="gs-k">\uc7a5\uba74</span><span class="gs-v">'+kmConduct(d,q,KM.sev,KM.inv)[1]+'</span></div>'+'</div></div>';
   }
   h+='<div class="km-note"><b>\uc790\ub9ac\ubc14\uafc8\uc744 \ubc14\uafd4\uac00\uba70 \ub4e4\uc5b4\ubcf4\uc138\uc694.</b> '+KM_INVFEEL[Math.min(KM.inv,3)]+'</div>';
   document.getElementById('kmBody').innerHTML=h;
