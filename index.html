@@ -150,6 +150,7 @@ header .sub{font-size:.78rem;color:var(--muted);font-family:var(--mono);font-wei
 .hide{display:none!important}
 #e66tabs{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
 #e66tabs .btm,#e66words .btm{white-space:nowrap;font-size:.7rem;padding:5px 9px}
+#lhOpt66{background:var(--surface2);color:var(--text);border:1px solid var(--line2);border-radius:9px;padding:5px 9px;font-size:.78rem;font-family:var(--mono)}
 #e66words{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
 #e66wrap{max-width:100%}
 .lh-fill.flash{background:var(--coral);}
@@ -1334,15 +1335,31 @@ function emoBuild66(){
 function emoGrp66(f){LEXSEL.fam=f;var l=lexByFam(f);if(l.length)LEXSEL.cur=l[0];emoBuild66();}
 function emoSel66(v){LEXSEL.cur=LEXWORDS[+v];emoBuild66();}
 
-var LH={on:false,ex:'hold'};
-var LHNAME={emo:'정서어 — 프레이즈 모양과 접촉을 손으로',hold:'중립 유지 — 개입하지 않기',cresc:'크레셴도 — 4마디에 걸쳐 키우기',cue:'큐 — 마디 마지막 박에 다음 진입 예고',whole:'지속음 유지 — 마디 내내 편 손'};
-function lhHTML(){return '<button class="bt-lh-toggle" id="lhToggle" onclick="lhToggle()">＋ 왼손 분리 연습</button><div class="lh-box" id="lhBox"><div class="lh-head">왼손 · <b id="lhName">중립 유지</b> <b id="lhTagName" style="color:var(--mint)"></b></div><div class="lh-main"><div class="lh-col"><div class="lh-sig"><div class="sigdot" id="lhSig"><span id="lhSigN">–</span></div><div class="sigcap" id="lhSigT">큐 없음</div></div><div class="lh-track"><div class="lh-fill" id="lhFill"></div><div class="ltgt hide" id="lhTgt"></div><div class="lmark" id="lhMark"></div><div class="cutdot hide" id="lhCutD"></div></div></div><div class="lh-exs"><button class="lhx on" data-x="hold" onclick="lhSet(\'hold\',this)">정지(중립)</button><button class="lhx" data-x="cresc" onclick="lhSet(\'cresc\',this)">크레셴도(4마디)</button><button class="lhx" data-x="cue" onclick="lhSet(\'cue\',this)">큐(마지막 박)</button><button class="lhx" data-x="whole" onclick="lhSet(\'whole\',this)">지속음 유지</button><button class=\'lhx\' data-x=\'emo\' onclick=\'lhSet("emo",this)\'>정서어</button></div></div><div id=\"e66wrap\" style=\"display:none;margin-top:8px\"><div class=\"bt-meters\" id=\"e66tabs\"></div><div class=\"bt-meters\" style=\"margin-top:5px\"><div id=\"e66words\" class=\"bt-meters\" style=\"margin-top:4px\"></div><span id=\"e66info\" style=\"font-size:.72rem;color:var(--muted);margin-left:8px\"></span></div></div><div class="lh-note">오른손은 박 패턴 유지, 왼손(바)은 위 과제를 동시에 — 따라하기(미러링) 없이!<br><b>크레셴도</b> 4마디에 걸쳐 서서히 키움 · <b>큐</b> 마디 마지막 박에 번쩍(다음 마디 진입 예고) · <b>지속음</b> 손을 편 채 마디 내내 같은 높이로 유지, 마디 첫 박에만 다시 확인</div></div>';}
+var LH={on:false,ex:'hold',cBars:1,cue:0};
+var LHNAME={emo:'정서어 — 프레이즈 모양과 접촉을 손으로',hold:'중립 유지 — 개입하지 않기',cresc:'크레셴도 — 정한 마디에 걸쳐 키우기',dim:'디크레셴도 — 정한 마디에 걸쳐 줄이기',cue:'큐 — 정한 박에 진입 예고',whole:'지속음 유지 — 마디 내내 편 손'};
+function lhHTML(){return '<button class="bt-lh-toggle" id="lhToggle" onclick="lhToggle()">＋ 왼손 분리 연습</button><div class="lh-box" id="lhBox"><div class="lh-head">왼손 · <b id="lhName">중립 유지</b> <b id="lhTagName" style="color:var(--mint)"></b></div><div class="lh-main"><div class="lh-col"><div class="lh-sig"><div class="sigdot" id="lhSig"><span id="lhSigN">–</span></div><div class="sigcap" id="lhSigT">큐 없음</div></div><div class="lh-track"><div class="lh-fill" id="lhFill"></div><div class="ltgt hide" id="lhTgt"></div><div class="lmark" id="lhMark"></div><div class="cutdot hide" id="lhCutD"></div></div></div><div class="lh-exs"><button class="lhx on" data-x="hold" onclick="lhSet(\'hold\',this)">정지(중립)</button><button class="lhx" data-x="cresc" onclick="lhSet(\'cresc\',this)">크레셴도</button><button class="lhx" data-x="dim" onclick="lhSet(\'dim\',this)">디크레셴도</button><button class="lhx" data-x="cue" onclick="lhSet(\'cue\',this)">큐</button><button class="lhx" data-x="whole" onclick="lhSet(\'whole\',this)">지속음 유지</button><button class=\'lhx\' data-x=\'emo\' onclick=\'lhSet("emo",this)\'>정서어</button></div></div><div class=\"bt-meters\" id=\"lhOptRow\" style=\"margin-top:8px;display:none\"><span class=\"bt-sublab\" id=\"lhOptLab\">길이</span><select id=\"lhOpt66\" onchange=\"lhSetOpt(this.value)\"></select></div><div id=\"e66wrap\" style=\"display:none;margin-top:8px\"><div class=\"bt-meters\" id=\"e66tabs\"></div><div class=\"bt-meters\" style=\"margin-top:5px\"><div id=\"e66words\" class=\"bt-meters\" style=\"margin-top:4px\"></div><span id=\"e66info\" style=\"font-size:.72rem;color:var(--muted);margin-left:8px\"></span></div></div><div class="lh-note">오른손은 박 패턴 유지, 왼손(바)은 위 과제를 동시에 — 따라하기(미러링) 없이!<br><b>크레셴도</b> 4마디에 걸쳐 서서히 키움 · <b>큐</b> 마디 마지막 박에 번쩍(다음 마디 진입 예고) · <b>지속음</b> 손을 편 채 마디 내내 같은 높이로 유지, 마디 첫 박에만 다시 확인</div></div>';}
 function lhToggle(){LH.on=!LH.on;var box=document.getElementById('lhBox'),btn=document.getElementById('lhToggle');if(box)box.classList.toggle('on',LH.on);if(btn){btn.classList.toggle('on',LH.on);btn.textContent=(LH.on?'－':'＋')+' 왼손 분리 연습';}}
-function lhSet(ex,btn){LH.ex=ex;var _w=document.getElementById('e66wrap');if(_w){_w.style.display=(ex==='emo')?'block':'none';if(ex==='emo')emoBuild66();}document.querySelectorAll('.lhx').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-x')===ex);});var nm=document.getElementById('lhName');if(nm)nm.textContent=LHNAME[ex];}
+function lhSetOpt(v){ if(LH.ex==='cresc'||LH.ex==='dim')LH.cBars=+v; else if(LH.ex==='cue')LH.cue=+v; lhOptSync(); }
+function lhOptSync(){
+  var row=document.getElementById('lhOptRow'),sel=document.getElementById('lhOpt66'),lab=document.getElementById('lhOptLab');
+  if(!row||!sel)return;
+  if(LH.ex==='cresc'||LH.ex==='dim'){
+    row.style.display='flex';lab.textContent='길이';
+    var o='';[1,2,4,8].forEach(function(x){o+='<option value="'+x+'"'+(LH.cBars===x?' selected':'')+'>'+x+'마디</option>';});
+    sel.innerHTML=o;
+  } else if(LH.ex==='cue'){
+    row.style.display='flex';lab.textContent='큐 박';
+    var o2='';for(var i=0;i<BT.meter;i++)o2+='<option value="'+i+'"'+(LH.cue===i?' selected':'')+'>'+(i+1)+'박</option>';
+    o2+='<option value="-1"'+(LH.cue===-1?' selected':'')+'>마지막 박</option>';
+    sel.innerHTML=o2;
+  } else row.style.display='none';
+}
+function lhSet(ex,btn){LH.ex=ex;lhOptSync();var _w=document.getElementById('e66wrap');if(_w){_w.style.display=(ex==='emo')?'block':'none';if(ex==='emo')emoBuild66();}document.querySelectorAll('.lhx').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-x')===ex);});var nm=document.getElementById('lhName');if(nm)nm.textContent=LHNAME[ex];}
 function lhUpdate(){if(!LH.on)return;var a=ac();var el=a.currentTime-BT.t0;if(el<0)el=0;var bd=60/BT.bpm;var tb=el/bd;var bi=Math.floor(tb)%BT.meter;var fr=tb-Math.floor(tb);var v=0.08,flash=false;
 if(LH.ex==='hold'){v=0.08;}
-else if(LH.ex==='cresc'){v=(tb/(BT.meter*4))%1;}
-else if(LH.ex==='cue'){var on=(bi===BT.meter-1)&&fr<0.5;v=on?0.92:0.14;flash=on;}
+else if(LH.ex==='cresc'){v=0.10+0.85*((tb/(BT.meter*LH.cBars))%1);}
+else if(LH.ex==='dim'){v=0.95-0.85*((tb/(BT.meter*LH.cBars))%1);}
+else if(LH.ex==='cue'){var _t=(LH.cue<0?BT.meter-1:Math.min(LH.cue,BT.meter-1));var on=(bi===_t)&&fr<0.5;v=on?0.92:0.14;flash=on;}
 else if(LH.ex==='whole'){var dn=(bi===0)&&fr<0.3;v=0.78;flash=dn;}
   else if(LH.ex==='emo'){var pp=(tb%BT.meter)/BT.meter;v=lexLevel(LEXSEL.cur,pp);var tg=document.getElementById('lhTagName');if(tg)tg.textContent=LEXSEL.cur.n+' · '+LEXSEL.cur.c;}
 var goal=v,cueQ=null,susP=null,cutN=false,nb=BT.meter,pb=tb%nb;
