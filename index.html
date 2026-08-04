@@ -75,6 +75,7 @@ header .sub{font-size:.78rem;color:var(--muted);font-family:var(--mono);font-wei
 .bt-focus{font-size:.92rem;color:var(--body);background:var(--surface2);border-radius:11px;padding:12px 14px;margin-bottom:14px;line-height:1.6;border-left:3px solid var(--mint);}.bt-focus b{color:var(--mint);font-weight:700;}
 .bt-box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 14px;}
 .btsvg{width:100%;max-width:250px;display:block;margin:0 auto 12px;}
+  .bt-sublab{font-size:.72rem;color:var(--muted);align-self:center;margin-right:4px}
 .km-keys{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 4px}
 .km-k{padding:7px 13px;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:999px;font-size:.86rem;font-weight:700;cursor:pointer}
 .km-k.on{background:var(--mint);color:#0e1418;border-color:var(--mint)}
@@ -128,6 +129,23 @@ header .sub{font-size:.78rem;color:var(--muted);font-family:var(--mono);font-wei
 .lh-main{display:flex;gap:15px;align-items:flex-end;justify-content:center;}
 .lh-track{width:30px;height:100px;background:var(--surface2);border:1px solid var(--line2);border-radius:7px;position:relative;overflow:hidden;flex:0 0 auto;}
 .lh-fill{position:absolute;bottom:0;left:0;right:0;height:8%;background:linear-gradient(180deg,#b6c4ea,#5a7bc0);}
+.lh-col{display:flex;flex-direction:column;align-items:center;gap:7px}
+.lh-sig{display:flex;flex-direction:column;align-items:center;gap:3px}
+.sigdot{width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--muted);transition:transform .08s,background .08s,border-color .08s}
+.sigdot.prep{border-color:var(--amber,#e8c98a);border-style:dashed;color:var(--amber,#e8c98a)}
+.sigdot.cue{background:var(--amber,#e8c98a);border-color:var(--amber,#e8c98a);color:#0a1013;transform:scale(1.28)}
+.sigcap{font-size:.62rem;font-weight:700;color:var(--muted)}
+.lh-track{width:44px;height:150px}
+.ltgt{position:absolute;left:2px;right:2px;height:3px;border-radius:2px;background:#e8c98a;bottom:0%;transition:bottom .08s linear;z-index:3;box-shadow:0 0 6px rgba(232,201,138,.5)}
+.lmark{position:absolute;left:50%;z-index:2;transform:translate(-50%,50%);width:20px;height:20px;border-radius:50%;background:var(--bg,#0a1013);border:3px solid var(--text);bottom:45%;transition:bottom .07s ease-out,transform .08s}
+.lmark.hot{border-color:#e8c98a;transform:translate(-50%,50%) scale(1.28);animation:mkbl66 .3s steps(2,end) infinite}
+@keyframes mkbl66{50%{opacity:.25}}
+.cutdot{position:absolute;left:50%;top:3px;transform:translateX(-50%);width:14px;height:14px;border-radius:50%;background:#ff8f7a;z-index:4;animation:cutbl66 .28s steps(2,end) infinite}
+@keyframes cutbl66{50%{opacity:.15}}
+.hide{display:none!important}
+#e66tabs{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
+#e66tabs .btm{white-space:nowrap;font-size:.7rem;padding:5px 9px}
+#e66wrap{max-width:100%}
 .lh-fill.flash{background:var(--coral);}
 .lh-exs{display:flex;flex-direction:column;gap:6px;}
 .lhx{font-size:.8rem;padding:7px 12px;border:1px solid var(--line2);background:var(--surface2);border-radius:8px;color:var(--muted);font-weight:600;text-align:left;}
@@ -818,27 +836,158 @@ var AC=null;function ac(){if(!AC)AC=new(window.AudioContext||window.webkitAudioC
 function rnd(n){return Math.floor(Math.random()*n);}
 function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=rnd(i+1),t=a[i];a[i]=a[j];a[j]=t;}return a;}
 var ICTUS={2:[[150,178],[150,48]],3:[[150,178],[228,112],[150,48]],4:[[150,182],[62,116],[236,116],[150,46]],6:[[150,182],[108,150],[82,110],[220,110],[246,150],[150,46]]};
-var BT={playing:false,meter:4,bpm:72,t0:0,curBeat:0,nextT:0,timer:null,raf:null};
+
+/* ── 비팅 도형 생성기: 1박 최저점, 마지막 박 최고점, 나머지는 좌/우 배분 ── */
+var BTPAT={2:{L:0,R:0},3:{L:0,R:1},4:{L:1,R:1},5:{L:1,R:2},6:{L:2,R:2},7:{L:2,R:3},8:{L:3,R:3},9:{L:3,R:4},12:{L:5,R:5}};
+var BTSHAPE={L:null};
+function btSplit(m){
+  var mid=Math.max(0,m-2);
+  if(BTSHAPE.L!=null){var L2=Math.max(0,Math.min(mid,BTSHAPE.L));return {L:L2,R:mid-L2};}
+  var pat=BTPAT[m];
+  if(pat)return {L:pat.L,R:pat.R};
+  var L=Math.floor(mid/2); if(mid>=2){L=Math.max(1,Math.min(mid-1,L));}
+  return {L:L,R:mid-L};
+}
+function btPoints(m){
+  var sp=btSplit(m), L=sp.L, R=sp.R;
+  var CX=150, TOP=74, BOT=182, LX=54, RX=246;
+  var pts=[[CX,BOT]];                          /* 1박 = 최저점(다운) */
+  for(var i=0;i<L;i++){
+    var s=(L===1)?1:(i/(L-1)), t=(L===1)?1:(0.38+0.62*s);   /* 안쪽 → 바깥쪽 */
+    pts.push([CX-(CX-LX)*t, BOT-(BOT-TOP)*(0.18+0.30*s)]);
+  }
+  for(var j=0;j<R;j++){
+    var s2=(R===1)?1:(j/(R-1)), u=(R===1)?1:(0.38+0.62*s2); /* 안쪽 → 바깥쪽 */
+    pts.push([CX+(RX-CX)*u, BOT-(BOT-TOP)*(0.20+0.42*s2)]);
+  }
+  pts.push([CX,TOP]);                          /* 마지막 박 = 최고점(업) */
+  return pts;
+}
+function btPts(){ return (BT.custom&&BT.custom.length===BT.meter)?BT.custom:btPoints(BT.meter); }
+
+var BT={playing:false,meter:4,sub:1,custom:null,bpm:72,t0:0,curBeat:0,nextT:0,timer:null,raf:null};
 function btClick(beat,time){var a=ac();var o=a.createOscillator(),g=a.createGain();o.frequency.value=beat===0?900:640;o.connect(g);g.connect(a.destination);g.gain.setValueAtTime(0.0001,time);g.gain.exponentialRampToValueAtTime(beat===0?0.5:0.32,time+0.004);g.gain.exponentialRampToValueAtTime(0.0001,time+0.08);o.start(time);o.stop(time+0.1);}
-function btSched(){var a=ac();while(BT.nextT<a.currentTime+0.12){btClick(BT.curBeat,BT.nextT);BT.nextT+=60/BT.bpm;BT.curBeat=(BT.curBeat+1)%BT.meter;}}
-function btFrame(){var a=ac();var el=a.currentTime-BT.t0;if(el<0)el=0;var bd=60/BT.bpm;var tb=el/bd;var bi=Math.floor(tb)%BT.meter;var fr=tb-Math.floor(tb);var pts=ICTUS[BT.meter];var p0=pts[bi],p1=pts[(bi+1)%BT.meter];var e=fr<.5?2*fr*fr:1-Math.pow(-2*fr+2,2)/2;var x=p0[0]+(p1[0]-p0[0])*e,y=p0[1]+(p1[1]-p0[1])*e;var dot=document.getElementById('btDot');if(dot){dot.setAttribute('cx',x);dot.setAttribute('cy',y);}var lab=document.getElementById('btBeatN');if(lab)lab.innerHTML='<b>'+(bi+1)+'</b> / '+BT.meter;lhUpdate();BT.raf=requestAnimationFrame(btFrame);}
-function btStart(){if(BT.playing)return;ac();BT.playing=true;BT.curBeat=0;BT.nextT=ac().currentTime+0.12;BT.t0=BT.nextT;BT.timer=setInterval(btSched,25);btFrame();var b=document.getElementById('btPlay');if(b)b.textContent='■ 정지';}
+function btSched(){var a=ac();var bd=60/BT.bpm;while(BT.nextT<a.currentTime+0.12){btClick(BT.curBeat,BT.nextT);if(BT.sub===2){btSub(BT.nextT+bd/3);btSub(BT.nextT+bd*2/3);}BT.nextT+=bd;BT.curBeat=(BT.curBeat+1)%BT.meter;}}
+function btSub(time){var a=ac();var o=a.createOscillator(),g=a.createGain();o.frequency.value=1250;o.connect(g);g.connect(a.destination);g.gain.setValueAtTime(0.0001,time);g.gain.exponentialRampToValueAtTime(0.09,time+0.003);g.gain.exponentialRampToValueAtTime(0.0001,time+0.045);o.start(time);o.stop(time+0.06);}
+function btFrame(){var a=ac();var el=a.currentTime-BT.t0;if(el<0)el=0;var bd=60/BT.bpm;var tbAll=el/bd-1;var bi,fr;if(tbAll<0){bi=BT.meter-1;fr=tbAll+1;}else{bi=Math.floor(tbAll)%BT.meter;fr=tbAll-Math.floor(tbAll);}var pts=btPts();var p0=pts[bi],p1=pts[(bi+1)%BT.meter];var isLast=(bi===BT.meter-1);var te=Math.pow(fr,isLast?1.42:1.28),rise=(bi===0?34:(isLast?48:22)),arc=rise*Math.sin(Math.PI*Math.pow(fr,isLast?0.62:0.85));var x=p0[0]+(p1[0]-p0[0])*te,y=p0[1]+(p1[1]-p0[1])*te-arc;var dot=document.getElementById('btDot');if(dot){dot.setAttribute('cx',x);dot.setAttribute('cy',y);var sq=fr<0.10?(1-fr*3.2):1;dot.setAttribute('r',(11*(0.82+0.18*sq)).toFixed(1));}var lab=document.getElementById('btBeatN');if(lab)lab.innerHTML='<b>'+(bi+1)+'</b> / '+BT.meter;lhUpdate();BT.raf=requestAnimationFrame(btFrame);}
+function btStart(){if(BT.playing)return;ac();BT.playing=true;BT.curBeat=0;BT.t0=ac().currentTime+0.12;BT.nextT=BT.t0+60/BT.bpm;BT.timer=setInterval(btSched,25);btFrame();var b=document.getElementById('btPlay');if(b)b.textContent='■ 정지';}
 function btStop(){BT.playing=false;if(BT.timer)clearInterval(BT.timer);if(BT.raf)cancelAnimationFrame(BT.raf);var b=document.getElementById('btPlay');if(b)b.textContent='▶ 시작';}
 function btToggle(){BT.playing?btStop():btStart();}
 function btSetBpm(v){BT.bpm=+v;var e=document.getElementById('btBpmV');if(e)e.textContent=v;}
-function btSetMeter(m){btStop();BT.meter=m;renderBeatSVG();document.querySelectorAll('.btm').forEach(function(b){b.classList.toggle('on',+b.getAttribute('data-m')===m);});}
-function renderBeatSVG(){var pts=ICTUS[BT.meter];var path='M'+pts.map(function(p){return p[0]+','+p[1];}).join(' L')+' L'+pts[0][0]+','+pts[0][1];var s='<svg viewBox="0 0 300 220" class="btsvg">';s+='<path d="'+path+'" fill="none" stroke="rgba(255,255,255,.13)" stroke-width="1.6" stroke-dasharray="4 4"/>';pts.forEach(function(p,i){s+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(i===0?10:8)+'" fill="'+(i===0?'#ff6f61':'#7d93c8')+'" opacity=".45"/><text x="'+p[0]+'" y="'+(p[1]+4)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#eaf1f2">'+(i+1)+'</text>';});s+='<circle id="btDot" cx="'+pts[0][0]+'" cy="'+pts[0][1]+'" r="11" fill="#5fe0c0"/></svg>';var w=document.getElementById('btSvgWrap');if(w)w.innerHTML=s;}
+function btSetAx(v){BTSHAPE.L=(v===''||v==null)?null:+v;renderBeatSVG();btAxSync();}
+function btAxSync(){var s=document.getElementById('btAx');if(!s)return;var mid=Math.max(0,BT.meter-2);
+  var row=s.parentElement; if(row)row.style.display=(mid<1)?'none':'flex';
+  if(mid<1){s.innerHTML='';return;}
+  var cur=(BTSHAPE.L!=null)?Math.min(BTSHAPE.L,mid):btSplit(BT.meter).L;var o='';
+  var lo=(mid>=2)?1:0, hi=(mid>=2)?mid-1:mid;
+  var cur2=Math.max(lo,Math.min(hi,cur)); if(cur2!==cur&&BTSHAPE.L!=null)BTSHAPE.L=cur2;
+  for(var i=lo;i<=hi;i++)o+='<option value="'+i+'"'+(i===cur2?' selected':'')+'>왼 '+i+' · 오 '+(mid-i)+'</option>';
+  s.innerHTML=o;}
+function btSetSub(s){btStop();BT.sub=s;renderBeatSVG();document.querySelectorAll('.bts').forEach(function(b){b.classList.toggle('on',+b.getAttribute('data-s')===s);});}
+function btSetMeter(m){btStop();BT.meter=m;renderBeatSVG();btAxSync();document.querySelectorAll('.btm').forEach(function(b){b.classList.toggle('on',+b.getAttribute('data-m')===m);});}
+function renderBeatSVG(){var pts=btPts();var path='M'+pts.map(function(p){return p[0]+','+p[1];}).join(' L')+' L'+pts[0][0]+','+pts[0][1];var s='<svg viewBox="0 0 300 220" class="btsvg">';s+='<path d="'+path+'" fill="none" stroke="rgba(255,255,255,.13)" stroke-width="1.6" stroke-dasharray="4 4"/>';pts.forEach(function(p,i){s+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(i===0?10:8)+'" fill="'+(i===0?'#ff6f61':'#7d93c8')+'" opacity=".45"/><text x="'+p[0]+'" y="'+(p[1]+4)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#eaf1f2">'+(i+1)+'</text>';});s+='<circle id="btDot" cx="'+pts[pts.length-1][0]+'" cy="'+pts[pts.length-1][1]+'" r="11" fill="#5fe0c0"/></svg>';var w=document.getElementById('btSvgWrap');if(w)w.innerHTML=s;if(typeof btAxSync==='function')btAxSync();}
+var EGROUPS=[
+ {id:"A",name:"조용한 어두움",cls:"gA"},
+ {id:"B",name:"조용한 밝음",cls:"gB"},
+ {id:"C",name:"섞인 감정",cls:"gC"},
+ {id:"D",name:"솟아오르는 밝음",cls:"gD"},
+ {id:"E",name:"몰아치는 어두움",cls:"gE"},
+ {id:"F",name:"따로 노는 것",cls:"gF"}
+];
+var EEMO=[
+ {g:"A",n:"슬픔",  cl:"파시브",lk:"레가토",sz:"작게",r:2,     auf:"길고 느리게, 점 없이", lh:"지속 · 하향 압",      sc:"총주 뒤 현이 홀로 남아 이어갈 때"},
+ {g:"A",n:"쓸쓸함",cl:"파시브",lk:"레가토",sz:"아주 작게",r:1, auf:"길게, 거의 정지",      lh:"정지, 개입 최소",     sc:"독주 목관 하나만 남고 반주가 사라질 때"},
+ {g:"A",n:"체념",  cl:"파시브",lk:"레가토",sz:"점점 작게",r:2, auf:"늘어짐",               lh:"하강 후 정지",        sc:"악기가 하나씩 빠지며 내려앉을 때"},
+ {g:"A",n:"공허",  cl:"파시브",lk:"레가토",sz:"아주 작게",r:1, auf:"모호하게",             lh:"부동",                sc:"3도 없는 빈 화음이 극단 음역에 걸릴 때"},
+ {g:"B",n:"평온",  cl:"파시브",lk:"레가토",sz:"중간",r:3,     auf:"길고 균질하게",        lh:"펼침 · 지속",         sc:"넓게 벌린 지속 화음이 움직이지 않을 때"},
+ {g:"B",n:"온기",  cl:"파시브",lk:"레가토",sz:"중간",r:3,     auf:"둥글게",               lh:"감쌈 · 안쪽으로",     sc:"클라리넷·호른이 중역에서 겹칠 때"},
+ {g:"B",n:"애틋함",cl:"파시브",lk:"레가토",sz:"아주 작게",r:1, auf:"길고 조심스럽게",      lh:"정지, 시선으로",      sc:"바이올린 독주가 완전히 노출될 때"},
+ {g:"C",n:"그리움",cl:"파시브",lk:"레가토",sz:"대비 크게",r:4, auf:"길게",                 lh:"독주 억제 / 총주 견인",sc:"독주와 총주가 번갈아 회상을 주고받을 때"},
+ {g:"C",n:"비장",  cl:"악티브",lk:"레가토",sz:"크게",r:4,     auf:"눌러서",               lh:"저역 압박",           sc:"저역이 무겁게 깔린 채 선율이 올라갈 때"},
+ {g:"C",n:"경외",  cl:"파시브",lk:"레가토",sz:"크게",r:4,     auf:"아주 길게",            lh:"음역 높이차 지시",    sc:"극저역과 극고역만 남고 중간이 빌 때"},
+ {g:"C",n:"초월",  cl:"파시브",lk:"레가토",sz:"크게",r:4,     auf:"상승",                 lh:"든 채 유지",          sc:"올라간 뒤 끝내지 않고 그대로 지속할 때"},
+ {g:"D",n:"환희",  cl:"악티브",lk:"레가토",sz:"크게",r:4,     auf:"짧고 탄력 있게",       lh:"개방",                sc:"전 음역이 열리며 두터운 화성에 닿을 때"},
+ {g:"D",n:"고양",  cl:"악티브",lk:"레가토",sz:"점점 크게",r:4, auf:"점점 짧게",            lh:"순차 큐",             sc:"악기가 하나씩 얹히며 올라갈 때"},
+ {g:"D",n:"승리",  cl:"악티브",lk:"세코",  sz:"최대",r:5,     auf:"짧고 단호하게",        lh:"금관 지시",           sc:"금관 유니즌 팡파르로 닫을 때"},
+ {g:"D",n:"활기",  cl:"악티브",lk:"세코",  sz:"작게",r:2,     auf:"짧게",                 lh:"최소 · 가벼운 큐",    sc:"스타카토 목관이 간극을 두고 튀어다닐 때"},
+ {g:"E",n:"긴장",  cl:"악티브",lk:"세코",  sz:"작게",r:2,     auf:"짧고 억제해서",        lh:"하향 억제",           sc:"저현 트레몰로가 선율 없이 깔릴 때"},
+ {g:"E",n:"불안",  cl:"악티브",lk:"세코",  sz:"불균등",r:3,   auf:"불안정하게",           lh:"파편 큐",             sc:"목관 단편이 어긋나며 끊길 때"},
+ {g:"E",n:"공포",  cl:"악티브",lk:"세코",  sz:"급변",r:5,     auf:"없거나 아주 급하게",   lh:"급정지 / 급개방",     sc:"돌발 sfz가 침묵을 찢을 때"},
+ {g:"E",n:"절박",  cl:"악티브",lk:"레가토",sz:"크게",r:4,     auf:"짧게",                 lh:"계속 견인",           sc:"현 급속 음형이 쉼 없이 이어질 때"},
+ {g:"E",n:"광란",  cl:"악티브",lk:"세코",  sz:"최대",r:5,     auf:"짧게",                 lh:"최소, 박만",          sc:"튜티와 타악이 포화 상태로 몰아칠 때"},
+ {g:"F",n:"익살",  cl:"악티브",lk:"세코",  sz:"중간 · 급변",r:3,auf:"변칙적으로",         lh:"과장 큐",             sc:"기대를 어긋내는 타이밍이 웃음이 될 때"}
+];
+var EVARS=[
+ {t:"큰 파시브",s:"크기 ↑ · 파시브 유지",b:"경외 · 초월 · 총주의 평온. 큰데 점이 없다."},
+ {t:"작은 악티브",s:"크기 ↓ · 악티브 유지",b:"긴장 · 활기. 손목만으로 점을 또렷하게."},
+ {t:"파시브 세코",s:"두 축의 분리",b:"점은 흐린데 박은 끊는다. 드물지만 강력."},
+ {t:"악티브 레가토",s:"두 축의 분리",b:"점은 또렷한데 이어 끈다. 비장 · 절박."},
+ {t:"업이 악티브",s:"방향 분리",b:"여린내기 진입. 업에 점을 준다."},
+ {t:"약박이 큼",s:"강세 분리",b:"4박 반동으로 다음 강박을 끌어온다."},
+ {t:"벗어날 때",s:"공통 규칙",b:"예비박이 먼저 알린다. 예고 없으면 사고다."}
+];
+var EGROW=[
+ {t:"흐린 축적",s:"파시브 유지",b:"슬픔 · 그리움 · 쓸쓸함",c:"gA"},
+ {t:"무거운 축적",s:"파시브 → 악티브",b:"비장 · 경외 · 절박",c:"gC"},
+ {t:"가벼운 축적",s:"악티브 유지 · 예비박 단축",b:"환희 · 고양 · 활기",c:"gD"}
+];
+var EMOS={grp:EEMO[0].g,cur:EEMO[0]};
+function emoTarget66(bp,n,barPos){
+  var e=EMOS.cur,t=e.lh,bi=Math.floor(bp),fr=bp-bi,last=(bi===n-1),first=(bi===0);
+  var br=Math.sin(barPos*Math.PI*2),sw=Math.sin(barPos*Math.PI);
+  if(/급정지|급개방/.test(t)){if(last&&fr<0.35)return{v:0.95,f:1,tag:'급개방'};if(last&&fr>=0.55)return{v:0.14,tag:'급정지'};return{v:0.18,tag:'닫힘'};}
+  if(/파편/.test(t)){var hit=((bi*5+3)%3===0)&&fr<0.26;return hit?{v:0.88,f:1,tag:'파편 큐'}:{v:0.32,tag:'억제'};}
+  if(/순차 큐/.test(t)){var on=fr<0.30;return on?{v:0.55+0.34*(bi/(n-1||1)),f:1,tag:(bi+1)+'번째 큐'}:{v:0.44+0.10*sw,tag:'준비'};}
+  if(/금관|과장 큐|가벼운 큐/.test(t)){if(last&&fr<0.5)return{v:0.92,f:1,tag:'큐'};if(bi===n-2&&fr>0.55)return{v:0.30,tag:'큐 예비'};return{v:0.46,tag:'대기'};}
+  if(/계속 견인/.test(t))return{v:0.60+0.16*sw,tag:'견인'};
+  if(/독주 억제/.test(t))return{v:0.34+0.22*sw,tag:sw>0.6?'총주 견인':'독주 억제'};
+  if(/하강 후 정지/.test(t))return{v:Math.max(0.24,0.74-barPos*0.56),tag:'하강'};
+  if(/부동|정지, 개입|최소, 박만|시선/.test(t))return{v:0.45,tag:'개입 없음'};
+  if(/하향|저역|억제/.test(t))return{v:0.32-0.09*sw,f:(first&&fr<0.1)?1:0,tag:'하향 압'};
+  if(/감쌈/.test(t))return{v:0.54+0.12*sw,tag:'감쌈'};
+  if(/음역/.test(t))return{v:(bi%2===0)?0.80:0.28,tag:(bi%2===0)?'고역':'저역'};
+  if(/펼침|개방|든 채|지속/.test(t))return{v:0.72+0.14*sw,f:(first&&fr<0.1)?1:0,tag:'펼쳐 유지'};
+  return{v:0.45,tag:'중립'};
+}
+function emoBuild66(){
+  var g=document.getElementById('e66tabs'),s=document.getElementById('e66sel');if(!g||!s)return;
+  var gh='';EGROUPS.forEach(function(x){gh+='<button class="btm'+(EMOS.grp===x.id?' on':'')+'" onclick="emoGrp66(\''+x.id+'\')">'+x.name+'</button>';});
+  g.innerHTML=gh;
+  var eh='';EEMO.forEach(function(x,i){if(x.g===EMOS.grp)eh+='<option value="'+i+'"'+(x.n===EMOS.cur.n?' selected':'')+'>'+x.n+'</option>';});
+  s.innerHTML=eh;
+  var inf=document.getElementById('e66info');
+  if(inf)inf.innerHTML='<b>'+EMOS.cur.cl+'·'+EMOS.cur.lk+'</b> · 왼손 <b>'+EMOS.cur.lh+'</b>';
+}
+function emoGrp66(g){EMOS.grp=g;var l=EEMO.filter(function(x){return x.g===g;});if(l.length)EMOS.cur=l[0];emoBuild66();}
+function emoSel66(v){EMOS.cur=EEMO[+v];emoBuild66();}
+
 var LH={on:false,ex:'hold'};
-var LHNAME={hold:'중립 유지',cresc:'4마디 크레셴도',cue:'큐 · 매 마디 3박',whole:'온음표 · 마디당 1회'};
-function lhHTML(){return '<button class="bt-lh-toggle" id="lhToggle" onclick="lhToggle()">＋ 왼손 분리 연습</button><div class="lh-box" id="lhBox"><div class="lh-head">왼손 · <b id="lhName">중립 유지</b></div><div class="lh-main"><div class="lh-track"><div class="lh-fill" id="lhFill"></div></div><div class="lh-exs"><button class="lhx on" data-x="hold" onclick="lhSet(\'hold\',this)">정지(중립)</button><button class="lhx" data-x="cresc" onclick="lhSet(\'cresc\',this)">4마디 크레셴도</button><button class="lhx" data-x="cue" onclick="lhSet(\'cue\',this)">큐 · 매 마디 3박</button><button class="lhx" data-x="whole" onclick="lhSet(\'whole\',this)">온음표 · 마디당 1회</button></div></div><div class="lh-note">오른손은 박 패턴 유지, 왼손(바)은 위 과제를 동시에 — 따라하기(미러링) 없이!</div></div>';}
+var LHNAME={emo:'감정 따라 — 감정의 왼손 지시를 그대로',hold:'중립 유지 — 개입하지 않기',cresc:'크레셴도 — 4마디에 걸쳐 키우기',cue:'큐 — 마디 마지막 박에 다음 진입 예고',whole:'지속음 유지 — 마디 내내 편 손'};
+function lhHTML(){return '<button class="bt-lh-toggle" id="lhToggle" onclick="lhToggle()">＋ 왼손 분리 연습</button><div class="lh-box" id="lhBox"><div class="lh-head">왼손 · <b id="lhName">중립 유지</b> <b id="lhTagName" style="color:var(--mint)"></b></div><div class="lh-main"><div class="lh-col"><div class="lh-sig"><div class="sigdot" id="lhSig"><span id="lhSigN">–</span></div><div class="sigcap" id="lhSigT">큐 없음</div></div><div class="lh-track"><div class="lh-fill" id="lhFill"></div><div class="ltgt hide" id="lhTgt"></div><div class="lmark" id="lhMark"></div><div class="cutdot hide" id="lhCutD"></div></div></div><div class="lh-exs"><button class="lhx on" data-x="hold" onclick="lhSet(\'hold\',this)">정지(중립)</button><button class="lhx" data-x="cresc" onclick="lhSet(\'cresc\',this)">크레셴도(4마디)</button><button class="lhx" data-x="cue" onclick="lhSet(\'cue\',this)">큐(마지막 박)</button><button class="lhx" data-x="whole" onclick="lhSet(\'whole\',this)">지속음 유지</button><button class=\'lhx\' data-x=\'emo\' onclick=\'lhSet("emo",this)\'>감정 따라</button></div></div><div id=\"e66wrap\" style=\"display:none;margin-top:8px\"><div class=\"bt-meters\" id=\"e66tabs\"></div><div class=\"bt-meters\" style=\"margin-top:5px\"><select id=\"e66sel\" onchange=\"emoSel66(this.value)\" style=\"background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:5px 8px;font-size:.8rem\"></select><span id=\"e66info\" style=\"font-size:.72rem;color:var(--muted);margin-left:8px\"></span></div></div><div class="lh-note">오른손은 박 패턴 유지, 왼손(바)은 위 과제를 동시에 — 따라하기(미러링) 없이!<br><b>크레셴도</b> 4마디에 걸쳐 서서히 키움 · <b>큐</b> 마디 마지막 박에 번쩍(다음 마디 진입 예고) · <b>지속음</b> 손을 편 채 마디 내내 같은 높이로 유지, 마디 첫 박에만 다시 확인</div></div>';}
 function lhToggle(){LH.on=!LH.on;var box=document.getElementById('lhBox'),btn=document.getElementById('lhToggle');if(box)box.classList.toggle('on',LH.on);if(btn){btn.classList.toggle('on',LH.on);btn.textContent=(LH.on?'－':'＋')+' 왼손 분리 연습';}}
-function lhSet(ex,btn){LH.ex=ex;document.querySelectorAll('.lhx').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-x')===ex);});var nm=document.getElementById('lhName');if(nm)nm.textContent=LHNAME[ex];}
+function lhSet(ex,btn){LH.ex=ex;var _w=document.getElementById('e66wrap');if(_w){_w.style.display=(ex==='emo')?'block':'none';if(ex==='emo')emoBuild66();}document.querySelectorAll('.lhx').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-x')===ex);});var nm=document.getElementById('lhName');if(nm)nm.textContent=LHNAME[ex];}
 function lhUpdate(){if(!LH.on)return;var a=ac();var el=a.currentTime-BT.t0;if(el<0)el=0;var bd=60/BT.bpm;var tb=el/bd;var bi=Math.floor(tb)%BT.meter;var fr=tb-Math.floor(tb);var v=0.08,flash=false;
 if(LH.ex==='hold'){v=0.08;}
 else if(LH.ex==='cresc'){v=(tb/(BT.meter*4))%1;}
-else if(LH.ex==='cue'){var on=(bi===2)&&fr<0.45;v=on?0.92:0.14;flash=on;}
-else if(LH.ex==='whole'){v=Math.sin(((tb%BT.meter)/BT.meter)*Math.PI);}
-var f=document.getElementById('lhFill');if(f){f.style.height=Math.max(4,Math.round(v*100))+'%';f.classList.toggle('flash',flash);}}
+else if(LH.ex==='cue'){var on=(bi===BT.meter-1)&&fr<0.5;v=on?0.92:0.14;flash=on;}
+else if(LH.ex==='whole'){var dn=(bi===0)&&fr<0.3;v=0.78;flash=dn;}
+  else if(LH.ex==='emo'){var T=emoTarget66(tb%BT.meter,BT.meter,(tb%BT.meter)/BT.meter);v=T.v;flash=!!T.f;var tg=document.getElementById('lhTagName');if(tg)tg.textContent=T.tag||'';}
+var goal=v,cueQ=null,susP=null,cutN=false,nb=BT.meter,pb=tb%nb;
+  if(LH.ex==='cue'){cueQ=nb-1;}
+  else if(LH.ex==='whole'){susP=pb/nb;goal=0.78;if(susP>0.97){cutN=true;}}
+  else if(LH.ex==='cresc'){goal=0.95;}
+  else if(LH.ex==='emo'){if(/큐|지시/.test(EMOS.cur.lh))cueQ=nb-1;}
+  var sd=document.getElementById('lhSig'),sn=document.getElementById('lhSigN'),sc=document.getElementById('lhSigT');
+  if(cueQ!=null){var rem=(cueQ-pb+nb)%nb;
+    if(sn)sn.textContent=(rem<0.08?'큐':rem.toFixed(1));
+    if(sd)sd.className='sigdot'+(rem<0.08?' cue':(rem<0.8?' prep':''));
+    if(sc)sc.textContent='큐까지';}
+  else{if(sn)sn.textContent='–';if(sd)sd.className='sigdot';if(sc)sc.textContent='큐 없음';}
+  var f=document.getElementById('lhFill');if(f){f.style.height=Math.max(4,Math.round(v*100))+'%';f.classList.toggle('flash',flash);}
+  var mk=document.getElementById('lhMark');if(mk){mk.style.bottom=Math.max(3,Math.round(goal*100))+'%';mk.classList.toggle('hot',Math.abs(v-goal)<0.07);}
+  var tg=document.getElementById('lhTgt'),cd=document.getElementById('lhCutD');
+  if(susP==null){if(tg)tg.classList.add('hide');if(cd)cd.classList.add('hide');}
+  else{if(tg){tg.classList.remove('hide');tg.style.bottom=Math.min(96,Math.round(susP*96))+'%';}if(cd)cd.classList.toggle('hide',!cutN);}}
 
 
 function tone(midi,time,dur,gain){var a=ac();var o=a.createOscillator(),g=a.createGain();o.type='triangle';o.frequency.value=440*Math.pow(2,(midi-69)/12);o.connect(g);g.connect(a.destination);g.gain.setValueAtTime(0.0001,time);g.gain.exponentialRampToValueAtTime(gain,time+0.02);g.gain.exponentialRampToValueAtTime(0.0001,time+dur);o.start(time);o.stop(time+dur+0.05);}
@@ -914,7 +1063,7 @@ function openDay(n){
   // 1 비팅
   h+='<div class="sec"><div class="sec-h"><span class="n">1</span>비팅 연습 <span class="tag">CONDUCTING</span></div>';
   h+='<div class="lesson-card"><div class="lesson-h">🎼 오늘의 지휘 레슨 · '+bp.lt+'</div><ul class="lesson-ul">'+bp.lb.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul></div>';h+='<div class="bt-focus"><b>오늘 트레이너 포커스 · </b>'+bp.f+'</div>';
-  h+='<div class="bt-box"><div id="btSvgWrap"></div><div class="bt-ctrl"><div class="bt-meters">'+[2,3,4,6].map(function(m){return '<button class="btm'+(m===bp.m?' on':'')+'" data-m="'+m+'" onclick="btSetMeter('+m+')">'+m+'박</button>';}).join('')+'</div><button class="bt-play" id="btPlay" onclick="btToggle()">▶ 시작</button><div class="bt-bpm">BPM <span id="btBpmV">'+bp.bpm+'</span><input type="range" min="40" max="152" value="'+bp.bpm+'" oninput="btSetBpm(this.value)"><span class="bt-beatn" id="btBeatN">-</span></div></div>'+lhHTML()+'</div></div>';
+  h+='<div class="bt-box"><div id="btSvgWrap"></div><div class="bt-ctrl"><div class="bt-meters">'+[2,3,4,5,6,7,8,9,12].map(function(m){return '<button class="btm'+(m===bp.m?' on':'')+'" data-m="'+m+'" onclick="btSetMeter('+m+')">'+m+'박</button>';}).join('')+'</div><div class="bt-meters" style="margin-top:6px"><span class="bt-sublab">가로축</span><select id="btAx" onchange="btSetAx(this.value)"></select><button class="btm" onclick="btSetAx(\'\')">자동</button></div><div class="bt-meters" style="margin-top:6px"><span class="bt-sublab">잔박</span>'+[[1,'4분음표 계열'],[2,'8분음표 · 3분박']].map(function(x){return '<button class="btm bts'+(x[0]===BT.sub?' on':'')+'" data-s="'+x[0]+'" onclick="btSetSub('+x[0]+')">'+x[1]+'</button>';}).join('')+'</div><button class="bt-play" id="btPlay" onclick="btToggle()">▶ 시작</button><div class="bt-bpm">BPM <span id="btBpmV">'+bp.bpm+'</span><input type="range" min="40" max="152" value="'+bp.bpm+'" oninput="btSetBpm(this.value)"><span class="bt-beatn" id="btBeatN">-</span></div></div>'+lhHTML()+'</div></div>';
   // 2 청음
   h+='<div class="sec"><div class="sec-h"><span class="n">2</span>청음 <span class="tag">EAR TRAINING</span></div>';
   h+='<div class="ear-tgt"><b>오늘 목표 · </b>'+ep[1]+'. 재생을 듣고 고르세요.</div><div id="earWrap"></div></div>';
